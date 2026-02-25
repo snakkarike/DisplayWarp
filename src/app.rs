@@ -1,9 +1,11 @@
 use std::sync::Arc;
-use windows::Win32::Foundation::RECT;
+use windows::Win32::Foundation::{HWND, RECT};
 
-use crate::models::{AppProfile, MonitorInfo, SavedData, SavedMonitorPos};
-use crate::monitor::{get_all_monitors, restore_monitor_layout, switch_primary_to};
-use crate::window::{move_to_monitor, wait_for_pid_exit, wait_for_window, wait_for_window_by_name};
+use crate::models::{AppProfile, MonitorInfo, SavedData};
+use crate::monitor::get_all_monitors;
+use crate::window::{
+    ProcessEntry, list_visible_windows, move_to_monitor, wait_for_window, wait_for_window_by_name,
+};
 
 // ─── Application State ───────────────────────────────────────────────────────
 
@@ -14,13 +16,15 @@ pub struct WindowManagerApp {
     pub new_profile_exe: Option<std::path::PathBuf>,
     pub selected_mon_idx: usize,
     pub new_profile_window_process: String,
-    pub new_profile_force_primary: bool,
     // ── Edit profile form state ──
     pub editing_profile_idx: Option<usize>,
     pub edit_profile_exe: Option<std::path::PathBuf>,
     pub edit_profile_mon_idx: usize,
     pub edit_profile_window_process: String,
-    pub edit_profile_force_primary: bool,
+    // ── Live-process mover state ──
+    pub live_processes: Vec<ProcessEntry>,
+    pub selected_live_process_idx: usize,
+    pub live_move_mon_idx: usize,
     // ── Shared ──
     pub status_message: Arc<parking_lot::Mutex<String>>,
 }
@@ -33,12 +37,13 @@ impl Default for WindowManagerApp {
             new_profile_exe: None,
             selected_mon_idx: 0,
             new_profile_window_process: String::new(),
-            new_profile_force_primary: false,
             editing_profile_idx: None,
             edit_profile_exe: None,
             edit_profile_mon_idx: 0,
             edit_profile_window_process: String::new(),
-            edit_profile_force_primary: false,
+            live_processes: vec![],
+            selected_live_process_idx: 0,
+            live_move_mon_idx: 0,
             status_message: Arc::new(parking_lot::Mutex::new(String::from("Ready."))),
         };
         app.refresh_monitors();
@@ -52,6 +57,11 @@ impl Default for WindowManagerApp {
 impl WindowManagerApp {
     pub fn refresh_monitors(&mut self) {
         self.monitors = get_all_monitors();
+    }
+
+    pub fn refresh_live_processes(&mut self) {
+        self.live_processes = list_visible_windows();
+        self.selected_live_process_idx = 0;
     }
 
     pub fn load_data(&mut self) {
@@ -76,14 +86,11 @@ impl WindowManagerApp {
             .map(|m| m.rect)
     }
 
-    /// Launch a profile.
-    /// - If force_primary: change the primary monitor first, launch, then restore when process exits.
-    /// - Otherwise: launch and use the window-moving strategy.
+    /// Launch a profile using the window-moving strategy.
     pub fn launch_profile(profile: &AppProfile, status: Arc<parking_lot::Mutex<String>>) {
         let exe = profile.exe_path.clone();
         let device_name = profile.target_monitor_name.clone();
         let window_process_name = profile.window_process_name.clone();
-        let force_primary = profile.force_primary;
 
         // Resolve target rect.
         let live_monitors = get_all_monitors();
@@ -103,77 +110,49 @@ impl WindowManagerApp {
             }
         };
 
-        if force_primary {
-            // ── Force-Primary path ───────────────────────────────────────────
-            // 1. Snapshot current layout so we can restore it
-            let snapshot = live_monitors
-                .iter()
-                .map(|m| SavedMonitorPos {
-                    device_name: m.device_name.clone(),
-                    rect: m.rect,
-                })
-                .collect::<Vec<_>>();
-
-            // 2. Switch primary to target monitor
-            *status.lock() = format!("⏳ Switching primary to {}...", device_name);
-            if !switch_primary_to(&device_name, &live_monitors) {
-                *status.lock() = "❌ Failed to switch primary monitor.".into();
+        // ── Window-moving path ───────────────────────────────────────────────
+        let cwd = exe.parent().unwrap().to_path_buf();
+        let child = match std::process::Command::new(&exe).current_dir(&cwd).spawn() {
+            Ok(c) => c,
+            Err(e) => {
+                *status.lock() = format!("❌ Failed to launch: {e}");
                 return;
             }
-            // Give Windows time to settle
-            std::thread::sleep(std::time::Duration::from_millis(1500));
-
-            // 3. Launch the process
-            let cwd = exe.parent().unwrap().to_path_buf();
-            let child = match std::process::Command::new(&exe).current_dir(&cwd).spawn() {
-                Ok(c) => c,
-                Err(e) => {
-                    *status.lock() = format!("❌ Failed to launch: {e}");
-                    restore_monitor_layout(&snapshot);
-                    return;
-                }
+        };
+        let pid = child.id();
+        std::thread::spawn(move || {
+            let hwnd = if let Some(proc_name) = window_process_name.filter(|s| !s.is_empty()) {
+                *status.lock() = format!("⏳ Waiting for '{proc_name}' window…");
+                wait_for_window_by_name(&proc_name, 30_000)
+            } else {
+                *status.lock() = format!("⏳ Launched PID {pid}, waiting for window…");
+                wait_for_window(pid, 15_000)
             };
-            let pid = child.id();
-            *status.lock() =
-                format!("⏳ Game launched (PID {pid}) — will restore monitors on exit.");
+            match hwnd {
+                Some(h) => {
+                    move_to_monitor(h, target_rect);
+                    *status.lock() = "✅ Window locked on target monitor.".into();
+                }
+                None => {
+                    *status.lock() =
+                        "⚠️ Window not found within timeout (app may still work normally).".into();
+                }
+            }
+        });
+    }
 
-            // 4. Background thread: wait for process exit, then restore
-            std::thread::spawn(move || {
-                wait_for_pid_exit(pid);
-                restore_monitor_layout(&snapshot);
-                *status.lock() = "✅ Game exited. Monitor layout restored.".into();
-            });
-        } else {
-            // ── Window-moving path ───────────────────────────────────────────
-            let cwd = exe.parent().unwrap().to_path_buf();
-            let child = match std::process::Command::new(&exe).current_dir(&cwd).spawn() {
-                Ok(c) => c,
-                Err(e) => {
-                    *status.lock() = format!("❌ Failed to launch: {e}");
-                    return;
-                }
-            };
-            let pid = child.id();
-            std::thread::spawn(move || {
-                let hwnd = if let Some(proc_name) = window_process_name.filter(|s| !s.is_empty()) {
-                    *status.lock() = format!("⏳ Waiting for '{proc_name}' window…");
-                    wait_for_window_by_name(&proc_name, 30_000)
-                } else {
-                    *status.lock() = format!("⏳ Launched PID {pid}, waiting for window…");
-                    wait_for_window(pid, 15_000)
-                };
-                match hwnd {
-                    Some(h) => {
-                        move_to_monitor(h, target_rect);
-                        *status.lock() = "✅ Window locked on target monitor.".into();
-                    }
-                    None => {
-                        *status.lock() =
-                            "⚠️ Window not found within timeout (app may still work normally)."
-                                .into();
-                    }
-                }
-            });
-        }
+    /// Move an already-running window (from the live-process list) to a target monitor rect.
+    pub fn move_live_window(
+        hwnd: HWND,
+        target_rect: RECT,
+        status: Arc<parking_lot::Mutex<String>>,
+    ) {
+        // HWND is not Send, so transmit the raw handle value as isize.
+        let hwnd_raw = hwnd.0 as isize;
+        std::thread::spawn(move || {
+            let hwnd = HWND(hwnd_raw as *mut _);
+            move_to_monitor(hwnd, target_rect);
+            *status.lock() = "✅ Window moved to target monitor.".into();
+        });
     }
 }

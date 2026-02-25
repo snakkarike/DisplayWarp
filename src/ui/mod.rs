@@ -12,13 +12,22 @@ impl eframe::App for WindowManagerApp {
         ctx.request_repaint_after(std::time::Duration::from_millis(500));
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Monitor Launcher");
+            ui.heading("DisplayWarp");
             ui.add_space(4.0);
 
             // ── Monitor layout preview ──────────────────────────────────
+            // Highlight the monitor that's active in the current context:
+            //   - while editing a profile → edit_profile_mon_idx
+            //   - otherwise              → selected_mon_idx (new-profile selector)
+            let preview_idx = if self.editing_profile_idx.is_some() {
+                self.edit_profile_mon_idx
+            } else {
+                self.selected_mon_idx
+            };
+
             ui.group(|ui| {
                 ui.label("📺 Monitor Layout  (green = selected target):");
-                self.draw_layout_preview(ui);
+                self.draw_layout_preview(ui, preview_idx);
                 ui.horizontal(|ui| {
                     if ui.button("🔄 Refresh Monitors").clicked() {
                         self.refresh_monitors();
@@ -52,6 +61,11 @@ impl eframe::App for WindowManagerApp {
 
             ui.add_space(6.0);
 
+            // ── Live-process mover ───────────────────────────────────────
+            panels::draw_live_process_mover(self, ui);
+
+            ui.add_space(6.0);
+
             // ── Status bar ───────────────────────────────────────────────
             panels::draw_status_bar(self, ui);
         });
@@ -61,7 +75,8 @@ impl eframe::App for WindowManagerApp {
 // ─── Layout Preview ──────────────────────────────────────────────────────────
 
 impl WindowManagerApp {
-    pub fn draw_layout_preview(&self, ui: &mut egui::Ui) {
+    /// `selected_idx` is which monitor slot to highlight green.
+    pub fn draw_layout_preview(&self, ui: &mut egui::Ui, selected_idx: usize) {
         let (rect, _) = ui.allocate_at_least(
             egui::vec2(ui.available_width(), 140.0),
             egui::Sense::hover(),
@@ -100,7 +115,7 @@ impl WindowManagerApp {
         let center = rect.center();
 
         for (i, m) in self.monitors.iter().enumerate() {
-            let is_selected = i == self.selected_mon_idx;
+            let is_selected = i == selected_idx;
             let m_rect = egui::Rect::from_min_max(
                 center
                     + egui::vec2(
@@ -135,7 +150,6 @@ impl WindowManagerApp {
                 egui::FontId::proportional(16.0),
                 egui::Color32::WHITE,
             );
-            // Show resolution below number
             let w = m.rect.right - m.rect.left;
             let h = m.rect.bottom - m.rect.top;
             painter.text(

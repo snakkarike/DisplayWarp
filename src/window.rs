@@ -9,10 +9,25 @@ use windows::Win32::System::Threading::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BringWindowToTop, EnumWindows, GWL_EXSTYLE, GetWindowLongW, GetWindowRect,
-    GetWindowTextLengthW, GetWindowThreadProcessId, HWND_TOP, IsWindowVisible, SW_MAXIMIZE,
-    SW_RESTORE, SWP_FRAMECHANGED, SWP_SHOWWINDOW, SetForegroundWindow, SetWindowPos, ShowWindow,
-    WS_EX_TOOLWINDOW,
+    GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HWND_TOP, IsWindowVisible,
+    SW_MAXIMIZE, SW_RESTORE, SWP_FRAMECHANGED, SWP_SHOWWINDOW, SetForegroundWindow, SetWindowPos,
+    ShowWindow, WS_EX_TOOLWINDOW,
 };
+
+// ─── Public types ─────────────────────────────────────────────────────────────
+
+/// A visible top-level window that can be moved by the user.
+#[derive(Clone)]
+pub struct ProcessEntry {
+    pub hwnd: HWND,
+    #[allow(dead_code)]
+    pub pid: u32,
+    /// Display label: "ExeName.exe — Window Title"
+    pub label: String,
+}
+
+unsafe impl Send for ProcessEntry {}
+unsafe impl Sync for ProcessEntry {}
 
 // ─── Internal helper structs ─────────────────────────────────────────────────
 
@@ -242,11 +257,87 @@ pub fn move_to_monitor(hwnd: HWND, target_rect: RECT) {
 }
 
 /// Block until a process (by PID) exits, or forever if it cannot be opened.
+#[allow(dead_code)]
 pub fn wait_for_pid_exit(pid: u32) {
     unsafe {
         if let Ok(hproc) = OpenProcess(PROCESS_SYNCHRONIZE, false, pid) {
             let _ = WaitForSingleObject(hproc, u32::MAX);
             let _ = windows::Win32::Foundation::CloseHandle(hproc);
         }
+    }
+}
+
+// ─── Live process enumeration ────────────────────────────────────────────────
+
+/// Return all visible top-level windows (with a title, not tool-windows) as
+/// `ProcessEntry` items that the UI can present for the live-process mover.
+pub fn list_visible_windows() -> Vec<ProcessEntry> {
+    let mut entries: Vec<ProcessEntry> = Vec::new();
+    unsafe {
+        let _ = EnumWindows(
+            Some(enum_visible_windows_callback),
+            LPARAM(&mut entries as *mut _ as isize),
+        );
+    }
+    // Sort by label for a stable, readable list
+    entries.sort_by(|a, b| a.label.cmp(&b.label));
+    entries
+}
+
+unsafe extern "system" fn enum_visible_windows_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
+    unsafe {
+        if !IsWindowVisible(hwnd).as_bool() {
+            return TRUE;
+        }
+        // Skip tool windows
+        let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+        if ex_style & WS_EX_TOOLWINDOW.0 != 0 {
+            return TRUE;
+        }
+        // Must have a title
+        let title_len = GetWindowTextLengthW(hwnd);
+        if title_len <= 0 {
+            return TRUE;
+        }
+        let mut title_buf = vec![0u16; (title_len + 1) as usize];
+        GetWindowTextW(hwnd, &mut title_buf);
+        let title = String::from_utf16_lossy(&title_buf)
+            .trim_matches('\0')
+            .to_string();
+
+        let mut pid: u32 = 0;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+
+        let exe_name = if let Ok(hproc) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
+        {
+            let mut buf = [0u16; 512];
+            let mut len = buf.len() as u32;
+            let name = if QueryFullProcessImageNameW(
+                hproc,
+                PROCESS_NAME_WIN32,
+                windows::core::PWSTR(buf.as_mut_ptr()),
+                &mut len,
+            )
+            .is_ok()
+            {
+                let full = String::from_utf16_lossy(&buf[..len as usize]);
+                full.split(['/', '\\']).last().unwrap_or("").to_string()
+            } else {
+                format!("PID {pid}")
+            };
+            let _ = windows::Win32::Foundation::CloseHandle(hproc);
+            name
+        } else {
+            format!("PID {pid}")
+        };
+
+        let entries = &mut *(lparam.0 as *mut Vec<ProcessEntry>);
+        entries.push(ProcessEntry {
+            hwnd,
+            pid,
+            label: format!("{exe_name} — {title}"),
+        });
+
+        TRUE
     }
 }

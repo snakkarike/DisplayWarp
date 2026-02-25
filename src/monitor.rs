@@ -48,6 +48,7 @@ unsafe extern "system" fn enum_monitor_callback(
 
 /// Make `target_device_name` the primary monitor by shifting all monitor
 /// coordinates so the target sits at (0, 0).
+#[allow(dead_code)]
 pub fn switch_primary_to(target_device_name: &str, monitors: &[MonitorInfo]) -> bool {
     let target = match monitors
         .iter()
@@ -102,6 +103,7 @@ pub fn switch_primary_to(target_device_name: &str, monitors: &[MonitorInfo]) -> 
 }
 
 /// Restore monitor positions from a saved snapshot.
+#[allow(dead_code)]
 pub fn restore_monitor_layout(snapshot: &[SavedMonitorPos]) {
     unsafe {
         for saved in snapshot {

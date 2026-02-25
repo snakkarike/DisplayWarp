@@ -46,6 +46,7 @@ pub struct MonitorInfo {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct SavedMonitorPos {
     pub device_name: String,
     pub rect: RECT,
