@@ -4,7 +4,8 @@ use windows::Win32::Foundation::{HWND, RECT};
 use crate::models::{AppProfile, MonitorInfo, SavedData};
 use crate::monitor::get_all_monitors;
 use crate::window::{
-    ProcessEntry, list_visible_windows, move_to_monitor, wait_for_window, wait_for_window_by_name,
+    ProcessEntry, list_visible_windows, move_to_monitor, move_window_once, wait_for_window,
+    wait_for_window_by_name,
 };
 
 // ─── Application State ───────────────────────────────────────────────────────
@@ -151,7 +152,7 @@ impl WindowManagerApp {
         let hwnd_raw = hwnd.0 as isize;
         std::thread::spawn(move || {
             let hwnd = HWND(hwnd_raw as *mut _);
-            move_to_monitor(hwnd, target_rect);
+            move_window_once(hwnd, target_rect);
             *status.lock() = "✅ Window moved to target monitor.".into();
         });
     }

@@ -195,6 +195,30 @@ fn monitor_for_rect(rect: RECT) -> HMONITOR {
     }
 }
 
+/// Move a window to the target monitor rect in a single, non-flickering operation.
+/// For live (already-running) windows. No retry loop, no watcher, no SW_MAXIMIZE/RESTORE.
+pub fn move_window_once(hwnd: HWND, target_rect: RECT) {
+    let w = target_rect.right - target_rect.left;
+    let h = target_rect.bottom - target_rect.top;
+    unsafe {
+        // SetWindowPos alone can reposition any window including maximized ones.
+        // Do NOT call SW_RESTORE first — it snaps a maximized window back to its
+        // pre-maximize position (on the old monitor) before the new SetWindowPos
+        // fires, causing a visible double-jump on every move.
+        let _ = SetWindowPos(
+            hwnd,
+            HWND_TOP,
+            target_rect.left,
+            target_rect.top,
+            w,
+            h,
+            SWP_SHOWWINDOW | SWP_FRAMECHANGED,
+        );
+        let _ = BringWindowToTop(hwnd);
+        let _ = SetForegroundWindow(hwnd);
+    }
+}
+
 /// Move a window to the target monitor rect, retrying until it sticks,
 /// then watch it for 45 seconds and enforce position if the game moves it back.
 pub fn move_to_monitor(hwnd: HWND, target_rect: RECT) {
