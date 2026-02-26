@@ -4,6 +4,8 @@
 
 ##### A lightweight Windows tray utility that intercepts app launches and warps windows to your preferred display — no more fighting the primary monitor monopoly.
 
+https://img.shields.io/github/v/release/<user>/<repo>
+
 [Download Latest Release](#) · [Quick Start](#quick-start) · [Building from Source](#building-from-source)
 
 ---
