@@ -23,6 +23,8 @@ pub struct ProcessEntry {
     pub hwnd: HWND,
     #[allow(dead_code)]
     pub pid: u32,
+    /// Full path to the executable, if it could be retrieved
+    pub exe_path: Option<std::path::PathBuf>,
     /// Display label: "ExeName.exe — Window Title"
     pub label: String,
 }
@@ -376,6 +378,7 @@ unsafe extern "system" fn enum_visible_windows_callback(hwnd: HWND, lparam: LPAR
         let mut pid: u32 = 0;
         GetWindowThreadProcessId(hwnd, Some(&mut pid));
 
+        let mut exe_path = None;
         let exe_name = if let Ok(hproc) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
         {
             let mut buf = [0u16; 512];
@@ -389,6 +392,11 @@ unsafe extern "system" fn enum_visible_windows_callback(hwnd: HWND, lparam: LPAR
             .is_ok()
             {
                 let full = String::from_utf16_lossy(&buf[..len as usize]);
+                // Remove trailing nulls if any
+                let full = full.trim_matches('\0');
+                if !full.is_empty() {
+                    exe_path = Some(std::path::PathBuf::from(full));
+                }
                 full.split(['/', '\\']).last().unwrap_or("").to_string()
             } else {
                 format!("PID {pid}")
@@ -403,6 +411,7 @@ unsafe extern "system" fn enum_visible_windows_callback(hwnd: HWND, lparam: LPAR
         entries.push(ProcessEntry {
             hwnd,
             pid,
+            exe_path,
             label: format!("{exe_name} — {title}"),
         });
 

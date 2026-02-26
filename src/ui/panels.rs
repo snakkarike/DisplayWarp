@@ -83,13 +83,13 @@ fn draw_profile_card(
             }
 
             // ── Persistent toggle ──
-            ui.horizontal(|ui| {
-                let mut persistent = p.persistent_monitor;
-                if ui.checkbox(&mut persistent, "Persistent Window").changed() {
-                    app.data.lock().profiles[i].persistent_monitor = persistent;
-                    app.save_data();
-                }
-            });
+            // ui.horizontal(|ui| {
+            //     let mut persistent = p.persistent_monitor;
+            //     if ui.checkbox(&mut persistent, "Persistent Window").changed() {
+            //         app.data.lock().profiles[i].persistent_monitor = persistent;
+            //         app.save_data();
+            //     }
+            // });
 
             ui.add_space(2.0);
 
@@ -114,6 +114,7 @@ fn draw_profile_card(
                     .clicked()
                 {
                     app.editing_profile_idx = Some(i);
+                    app.edit_profile_name = p.name.clone();
                     app.edit_profile_exe = None;
                     app.edit_profile_mon_idx = app
                         .monitors
@@ -153,10 +154,18 @@ fn draw_edit_profile_form(
         .stroke(egui::Stroke::new(1.5, egui::Color32::YELLOW))
         .show(ui, |ui| {
             ui.label(
-                egui::RichText::new(format!("{} Editing: {}", regular::PENCIL_SIMPLE, p.name))
+                egui::RichText::new(format!("{} Editing Profile", regular::PENCIL_SIMPLE))
                     .color(egui::Color32::YELLOW)
                     .strong(),
             );
+
+            ui.horizontal(|ui| {
+                ui.label("Name:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut app.edit_profile_name)
+                        .desired_width(f32::INFINITY),
+                );
+            });
 
             ui.horizontal(|ui| {
                 if ui
@@ -223,8 +232,8 @@ fn draw_edit_profile_form(
                         }
                         let mut data = app.data.lock();
                         let prof = &mut data.profiles[idx];
+                        prof.name = app.edit_profile_name.trim().to_string();
                         if let Some(new_exe) = app.edit_profile_exe.take() {
-                            prof.name = new_exe.file_name().unwrap().to_string_lossy().into_owned();
                             prof.exe_path = new_exe;
                         }
                         let mon = &app.monitors[app.edit_profile_mon_idx];
@@ -277,12 +286,29 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui.button("Select EXE").clicked() {
-                app.new_profile_exe = rfd::FileDialog::new()
+                if let Some(path) = rfd::FileDialog::new()
                     .add_filter("Executable", &["exe"])
-                    .pick_file();
+                    .pick_file()
+                {
+                    app.new_profile_exe = Some(path.clone());
+                    if app.new_profile_name.is_empty() {
+                        app.new_profile_name =
+                            path.file_name().unwrap().to_string_lossy().into_owned();
+                    }
+                }
             }
         });
     });
+
+    ui.add_space(2.0);
+
+    // Profile Name
+    ui.label(format!("{} Profile Name", regular::PENCIL_SIMPLE));
+    ui.add(
+        egui::TextEdit::singleline(&mut app.new_profile_name)
+            .hint_text("Enter profile name")
+            .desired_width(f32::INFINITY),
+    );
 
     ui.add_space(2.0);
 
@@ -321,7 +347,9 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     ui.add_space(4.0);
 
     // Save button
-    let can_save = app.new_profile_exe.is_some() && !app.monitors.is_empty();
+    let can_save = app.new_profile_exe.is_some()
+        && !app.monitors.is_empty()
+        && !app.new_profile_name.trim().is_empty();
     if ui
         .add_sized(
             [ui.available_width(), 28.0],
@@ -334,7 +362,7 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
         let mon = &app.monitors[app.selected_mon_idx];
         let proc_name = app.new_profile_window_process.trim().to_string();
         app.data.lock().profiles.push(AppProfile {
-            name: exe.file_name().unwrap().to_string_lossy().into_owned(),
+            name: app.new_profile_name.trim().to_string(),
             exe_path: exe,
             target_monitor_name: mon.device_name.clone(),
             target_monitor_rect: Some(SerializableRect {
@@ -352,6 +380,7 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             persistent_monitor: false,
         });
         app.new_profile_exe = None;
+        app.new_profile_name.clear();
         app.new_profile_window_process.clear();
         app.save_data();
     }
@@ -429,26 +458,68 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
 
     ui.add_space(6.0);
 
-    // Move button
+    // Move and Create Profile buttons
     let can_move = !app.live_processes.is_empty() && !app.monitors.is_empty();
-    if ui
-        .add_sized(
-            [ui.available_width(), 30.0],
-            egui::Button::new(
-                egui::RichText::new(format!("{} Move Process", regular::ARROWS_OUT_SIMPLE))
-                    .strong(),
+
+    ui.horizontal(|ui| {
+        let btn_width = (ui.available_width() - 8.0) / 2.0;
+        if ui
+            .add_sized(
+                [btn_width, 30.0],
+                egui::Button::new(
+                    egui::RichText::new(format!("{} Move Process", regular::ARROWS_OUT_SIMPLE))
+                        .strong(),
+                )
+                .fill(egui::Color32::from_rgb(50, 200, 100)),
             )
-            .fill(egui::Color32::from_rgb(50, 200, 100)),
-        )
-        .clicked()
-        && can_move
-    {
-        if let Some(entry) = app.live_processes.get(app.selected_live_process_idx) {
-            let hwnd = entry.hwnd;
-            let target = app.monitors[app.live_move_mon_idx].rect;
-            WindowManagerApp::move_live_window(hwnd, target, Arc::clone(&app.status_message));
+            .clicked()
+            && can_move
+        {
+            if let Some(entry) = app.live_processes.get(app.selected_live_process_idx) {
+                let hwnd = entry.hwnd;
+                let target = app.monitors[app.live_move_mon_idx].rect;
+                WindowManagerApp::move_live_window(hwnd, target, Arc::clone(&app.status_message));
+            }
         }
-    }
+
+        if ui
+            .add_sized(
+                [btn_width, 30.0],
+                egui::Button::new(
+                    egui::RichText::new(format!("{} Create Profile", regular::PLUS)).strong(),
+                )
+                .fill(egui::Color32::from_rgb(50, 100, 200)),
+            )
+            .clicked()
+            && can_move
+        {
+            if let Some(entry) = app.live_processes.get(app.selected_live_process_idx) {
+                if let Some(path) = &entry.exe_path {
+                    let mon = &app.monitors[app.live_move_mon_idx];
+                    let exe = path.clone();
+                    app.data.lock().profiles.push(AppProfile {
+                        name: exe.file_name().unwrap().to_string_lossy().into_owned(),
+                        exe_path: exe,
+                        target_monitor_name: mon.device_name.clone(),
+                        target_monitor_rect: Some(SerializableRect {
+                            left: mon.rect.left,
+                            top: mon.rect.top,
+                            right: mon.rect.right,
+                            bottom: mon.rect.bottom,
+                        }),
+                        window_process_name: None,
+                        force_primary: false,
+                        persistent_monitor: false,
+                    });
+                    app.save_data();
+                    *app.status_message.lock() = "✅ Profile created from live process.".into();
+                } else {
+                    *app.status_message.lock() =
+                        "❌ Could not determine executable path for this process.".into();
+                }
+            }
+        }
+    });
 }
 
 // ─── Status / Log Bar ────────────────────────────────────────────────────────

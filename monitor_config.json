@@ -1,11 +1,16 @@
 {
   "profiles": [
     {
-      "name": "Start English.exe",
+      "name": "Unravel Two",
       "exe_path": "G:\\Games\\Unravel Two\\Start English.exe",
       "target_monitor_name": "\\\\.\\DISPLAY2",
-      "target_monitor_rect": null,
-      "window_process_name": null,
+      "target_monitor_rect": {
+        "left": 2560,
+        "top": 0,
+        "right": 4480,
+        "bottom": 1080
+      },
+      "window_process_name": "UnravelTwo.exe",
       "force_primary": true,
       "persistent_monitor": false
     },

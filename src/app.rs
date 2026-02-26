@@ -17,11 +17,13 @@ pub struct WindowManagerApp {
     /// Shared so the background watcher can read profiles.
     pub data: Arc<parking_lot::Mutex<SavedData>>,
     // ── New profile form state ──
+    pub new_profile_name: String,
     pub new_profile_exe: Option<std::path::PathBuf>,
     pub selected_mon_idx: usize,
     pub new_profile_window_process: String,
     // ── Edit profile form state ──
     pub editing_profile_idx: Option<usize>,
+    pub edit_profile_name: String,
     pub edit_profile_exe: Option<std::path::PathBuf>,
     pub edit_profile_mon_idx: usize,
     pub edit_profile_window_process: String,
@@ -49,10 +51,12 @@ impl Default for WindowManagerApp {
         let mut app = Self {
             monitors: vec![],
             data: Arc::clone(&data),
+            new_profile_name: String::new(),
             new_profile_exe: None,
             selected_mon_idx: 0,
             new_profile_window_process: String::new(),
             editing_profile_idx: None,
+            edit_profile_name: String::new(),
             edit_profile_exe: None,
             edit_profile_mon_idx: 0,
             edit_profile_window_process: String::new(),
