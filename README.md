@@ -2,7 +2,7 @@
 
 #### Launch any application on any monitor, every time. Move live windows instantly.
 
-##### A lightweight Windows tray utility that intercepts app launches and warps windows to your preferred display — no more fighting the primary monitor monopoly.
+##### Windows is notoriously bad at remembering which monitor you want your apps to open on. DisplayWarp is a lightweight system tray utility that fixes this "primary monitor monopoly" by intercepting app launches and forcing them onto the display of your choice.
 
 ![Release](https://img.shields.io/github/v/release/snakkarike/DisplayWarp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
