@@ -94,6 +94,25 @@ impl eframe::App for WindowManagerApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(4.0);
 
+            // Lazy-load the logo texture on first frame.
+            // if self.logo_texture.is_none() {
+            //     let rgba = crate::svg_render::svg_to_rgba(
+            //         include_bytes!("../../assets/DisplayWarpLogo.svg"),
+            //         195,
+            //         30,
+            //     );
+            //     let image = egui::ColorImage::from_rgba_unmultiplied([195, 30], &rgba);
+            //     self.logo_texture =
+            //         Some(ctx.load_texture("logo", image, egui::TextureOptions::LINEAR));
+            // }
+            if let Some(tex) = &self.logo_texture {
+                ui.image(egui::load::SizedTexture::new(
+                    tex.id(),
+                    egui::vec2(195.0, 30.0),
+                ));
+            }
+            ui.add_space(8.0);
+
             // Monitor layout preview
             let preview_idx = if self.editing_profile_idx.is_some() {
                 self.edit_profile_mon_idx

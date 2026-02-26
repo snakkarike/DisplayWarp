@@ -35,6 +35,8 @@ pub struct WindowManagerApp {
     pub tray: Option<crate::tray::TrayItems>,
     // ── Close dialog ──
     pub show_close_dialog: bool,
+    // ── Logo texture ──
+    pub logo_texture: Option<eframe::egui::TextureHandle>,
     // ── Shared ──
     pub status_message: Arc<parking_lot::Mutex<String>>,
 }
@@ -60,6 +62,7 @@ impl Default for WindowManagerApp {
             watcher_running: Arc::clone(&watcher_running),
             tray: None,
             show_close_dialog: false,
+            logo_texture: None,
             status_message: Arc::new(parking_lot::Mutex::new(String::from("Ready."))),
         };
         app.refresh_monitors();

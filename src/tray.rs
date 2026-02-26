@@ -4,14 +4,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tray_icon::menu::{Menu, MenuEvent, MenuItem};
 use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
-/// Build a 16×16 RGBA icon filled with a single color.
-fn simple_icon(r: u8, g: u8, b: u8) -> Icon {
-    let size = 16u32;
-    let mut rgba = Vec::with_capacity((size * size * 4) as usize);
-    for _ in 0..(size * size) {
-        rgba.extend_from_slice(&[r, g, b, 255]);
-    }
-    Icon::from_rgba(rgba, size, size).expect("failed to create tray icon")
+/// Render the DisplayWarp SVG icon at 32×32 for the tray.
+fn tray_icon() -> Icon {
+    let rgba =
+        crate::svg_render::svg_to_rgba(include_bytes!("../assets/DisplayWarpIcon.svg"), 32, 32);
+    Icon::from_rgba(rgba, 32, 32).expect("failed to create tray icon")
 }
 
 pub struct TrayItems {
@@ -31,7 +28,7 @@ pub fn create_tray(watcher_running: Arc<AtomicBool>) -> TrayItems {
     let _ = menu.append(&show_item);
     let _ = menu.append(&quit_item);
 
-    let icon = simple_icon(50, 200, 100);
+    let icon = tray_icon();
 
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(menu))

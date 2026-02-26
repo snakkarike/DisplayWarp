@@ -3,6 +3,7 @@
 mod app;
 mod models;
 mod monitor;
+mod svg_render;
 mod tray;
 mod ui;
 mod window;
@@ -10,10 +11,20 @@ mod window;
 use eframe::egui;
 
 fn main() -> eframe::Result {
+    // Render the SVG icon for the window titlebar.
+    let icon_rgba =
+        svg_render::svg_to_rgba(include_bytes!("../assets/DisplayWarpIcon.svg"), 32, 32);
+    let icon = egui::IconData {
+        rgba: icon_rgba,
+        width: 32,
+        height: 32,
+    };
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([720.0, 800.0])
-            .with_min_inner_size([700.0, 600.0]),
+            .with_min_inner_size([700.0, 600.0])
+            .with_icon(std::sync::Arc::new(icon)),
         ..Default::default()
     };
     eframe::run_native(
