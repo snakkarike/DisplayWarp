@@ -39,13 +39,6 @@ impl eframe::App for WindowManagerApp {
                 panels::draw_status_bar(self, ui);
             });
 
-        // ── Bottom: Move Live Window (above log) ────────────────────────
-        egui::TopBottomPanel::bottom("live_mover_panel").show(ctx, |ui| {
-            ui.add_space(4.0);
-            panels::draw_live_process_mover(self, ui);
-            ui.add_space(4.0);
-        });
-
         // ── Central: everything else (flex-fills remaining space) ────────
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(4.0);
@@ -62,7 +55,7 @@ impl eframe::App for WindowManagerApp {
 
             ui.add_space(10.0);
 
-            // Two-column: New Profiles | Saved Profiles
+            // Two-column: New Profiles + Live Mover | Saved Profiles
             let col_height = ui.available_height();
             ui.columns(2, |cols| {
                 cols[0].group(|ui| {
@@ -74,6 +67,12 @@ impl eframe::App for WindowManagerApp {
                     );
                     ui.add_space(4.0);
                     panels::draw_new_profile_form(self, ui);
+
+                    ui.add_space(10.0);
+                    ui.separator();
+                    ui.add_space(4.0);
+
+                    panels::draw_live_process_mover(self, ui);
                 });
 
                 cols[1].group(|ui| {

@@ -26,12 +26,12 @@
     {
       "name": "Dispatch.exe",
       "exe_path": "G:\\Games\\Dispatch\\Dispatch.exe",
-      "target_monitor_name": "\\\\.\\DISPLAY2",
+      "target_monitor_name": "\\\\.\\DISPLAY3",
       "target_monitor_rect": {
-        "left": 2560,
+        "left": -3840,
         "top": 0,
-        "right": 4480,
-        "bottom": 1080
+        "right": 0,
+        "bottom": 2160
       },
       "window_process_name": null,
       "force_primary": false,
