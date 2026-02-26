@@ -42,8 +42,6 @@ impl eframe::App for WindowManagerApp {
         // ── Central: everything else (flex-fills remaining space) ────────
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(4.0);
-            ui.heading(egui::RichText::new("DisplayWarp").size(20.0).strong());
-            ui.add_space(8.0);
 
             // Monitor layout preview
             let preview_idx = if self.editing_profile_idx.is_some() {
