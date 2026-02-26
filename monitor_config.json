@@ -4,36 +4,24 @@
       "name": "Start English.exe",
       "exe_path": "G:\\Games\\Unravel Two\\Start English.exe",
       "target_monitor_name": "\\\\.\\DISPLAY2",
-      "force_primary": true
-    }
-  ],
-  "default_layout": [
+      "target_monitor_rect": null,
+      "window_process_name": null,
+      "force_primary": true,
+      "persistent_monitor": false
+    },
     {
-      "rect": {
+      "name": "DaveTheDiver.exe",
+      "exe_path": "G:\\Games\\Dave the Diver\\DaveTheDiver.exe",
+      "target_monitor_name": "\\\\.\\DISPLAY1",
+      "target_monitor_rect": {
         "left": 0,
         "top": 0,
         "right": 2560,
         "bottom": 1440
       },
-      "device_name": "\\\\.\\DISPLAY1"
-    },
-    {
-      "rect": {
-        "left": 2560,
-        "top": 352,
-        "right": 4480,
-        "bottom": 1432
-      },
-      "device_name": "\\\\.\\DISPLAY2"
-    },
-    {
-      "rect": {
-        "left": -3840,
-        "top": -718,
-        "right": 0,
-        "bottom": 1442
-      },
-      "device_name": "\\\\.\\DISPLAY3"
+      "window_process_name": null,
+      "force_primary": false,
+      "persistent_monitor": false
     }
   ]
 }
