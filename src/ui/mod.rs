@@ -63,8 +63,10 @@ impl eframe::App for WindowManagerApp {
             ui.add_space(10.0);
 
             // Two-column: New Profiles | Saved Profiles
+            let col_height = ui.available_height();
             ui.columns(2, |cols| {
                 cols[0].group(|ui| {
+                    ui.set_min_height(col_height - 12.0);
                     ui.label(
                         egui::RichText::new(format!("{} New Profiles", regular::PLUS_CIRCLE))
                             .size(14.0)
@@ -75,6 +77,7 @@ impl eframe::App for WindowManagerApp {
                 });
 
                 cols[1].group(|ui| {
+                    ui.set_min_height(col_height - 12.0);
                     ui.label(
                         egui::RichText::new(format!("{} Saved Profiles", regular::BOOKMARK_SIMPLE))
                             .size(14.0)
