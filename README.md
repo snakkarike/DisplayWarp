@@ -6,7 +6,7 @@
 
 ![Release](https://img.shields.io/github/v/release/snakkarike/DisplayWarp)
 ![License](https://img.shields.io/github/license/snakkarike/DisplayWarp)
-[![AI Code Assist](https://img.shields.io)]()
+[![Google Gemini](https://img.shields.io/badge/Google%20Gemini-886FBF?logo=googlegemini&logoColor=fff)](#)
 ![Rust](https://img.shields.io/badge/Rust-000000?style=flat&logo=rust&logoColor=white)
 
 [Download Latest Release](https://github.com/snakkarike/DisplayWarp/releases/tag/v1.0.0) · [Quick Start](#quick-start) · [Building from Source](#building-from-source)
