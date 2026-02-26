@@ -419,19 +419,22 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     } else {
         current_label.to_string()
     };
-    egui::ComboBox::from_id_salt("live_proc")
-        .selected_text(display_label)
-        .width(ui.available_width() - 8.0)
-        .show_ui(ui, |ui| {
-            for (i, entry) in app.live_processes.iter().enumerate() {
-                let label = if entry.label.len() > 60 {
-                    format!("{} {}…", regular::APP_WINDOW, &entry.label[..59])
-                } else {
-                    format!("{} {}", regular::APP_WINDOW, entry.label)
-                };
-                ui.selectable_value(&mut app.selected_live_process_idx, i, label);
-            }
-        });
+    ui.add_enabled_ui(!app.live_processes.is_empty(), |ui| {
+        egui::ComboBox::from_id_salt("live_proc")
+            .selected_text(display_label)
+            .width(ui.available_width() - 8.0)
+            .height(300.0)
+            .show_ui(ui, |ui| {
+                for (i, entry) in app.live_processes.iter().enumerate() {
+                    let label = if entry.label.len() > 60 {
+                        format!("{} {}…", regular::APP_WINDOW, &entry.label[..59])
+                    } else {
+                        format!("{} {}", regular::APP_WINDOW, entry.label)
+                    };
+                    ui.selectable_value(&mut app.selected_live_process_idx, i, label);
+                }
+            });
+    });
 
     ui.add_space(4.0);
 

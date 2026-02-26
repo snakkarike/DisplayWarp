@@ -70,6 +70,7 @@ impl Default for WindowManagerApp {
             status_message: Arc::new(parking_lot::Mutex::new(String::from("Ready."))),
         };
         app.refresh_monitors();
+        app.refresh_live_processes();
         app.load_data();
 
         // Start the background watcher thread.
