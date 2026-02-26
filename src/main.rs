@@ -10,9 +10,6 @@ mod window;
 use eframe::egui;
 
 fn main() -> eframe::Result {
-    // Create the tray icon on the main thread (required by Win32).
-    let tray_items = tray::create_tray();
-
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([720.0, 620.0]),
         ..Default::default()
@@ -22,6 +19,8 @@ fn main() -> eframe::Result {
         options,
         Box::new(move |_| {
             let mut app = app::WindowManagerApp::default();
+            // Create tray after app so we can share watcher_running.
+            let tray_items = tray::create_tray(app.watcher_running.clone());
             app.tray = Some(tray_items);
             Ok(Box::new(app))
         }),

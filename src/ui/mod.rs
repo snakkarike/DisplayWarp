@@ -1,30 +1,15 @@
 pub mod panels;
 
-use std::sync::atomic::Ordering;
-
 use eframe::egui;
 
 use crate::app::WindowManagerApp;
-use crate::tray;
 
 // ─── eframe App impl ─────────────────────────────────────────────────────────
 
 impl eframe::App for WindowManagerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Keep the event loop alive even when hidden (for tray menu polling).
+        // Poll for background status updates.
         ctx.request_repaint_after(std::time::Duration::from_millis(500));
-
-        // ── Handle tray menu events ──────────────────────────────────────
-        if let Some(id) = tray::poll_menu_event() {
-            if let Some(ref tray_items) = self.tray {
-                if id == tray_items.show_id {
-                    show_native_window(ctx);
-                } else if id == tray_items.quit_id {
-                    self.watcher_running.store(false, Ordering::Relaxed);
-                    std::process::exit(0);
-                }
-            }
-        }
 
         // ── Intercept close → hide to tray ──────────────────────────────
         // Read the flag FIRST (releases the input lock), then act on it.
@@ -94,36 +79,34 @@ impl eframe::App for WindowManagerApp {
 
 // ─── Native window show/hide ─────────────────────────────────────────────────
 
-/// Hide the eframe window using the native Win32 API.
-/// We avoid `Visible(false)` because eframe stops processing events for
-/// hidden windows, making it impossible to restore them via tray menu.
-fn hide_native_window(ctx: &egui::Context) {
-    if let Some(hwnd) = get_eframe_hwnd(ctx) {
-        unsafe {
-            use windows::Win32::UI::WindowsAndMessaging::{SW_HIDE, ShowWindow};
-            let _ = ShowWindow(hwnd, SW_HIDE);
-        }
-    }
-}
-
-/// Show the eframe window using the native Win32 API.
-fn show_native_window(ctx: &egui::Context) {
-    if let Some(hwnd) = get_eframe_hwnd(ctx) {
+/// "Minimize to tray": hide the window from the taskbar so only the
+/// system tray icon remains visible.
+///
+/// Uses the standard Windows pattern: SW_HIDE → change style → SW_SHOWMINNOACTIVE.
+/// This avoids visual glitches from changing styles on a visible window,
+/// and keeps the window alive (not destroyed) so eframe's event loop
+/// continues to run and can poll tray menu events.
+fn hide_native_window(_ctx: &egui::Context) {
+    if let Some(hwnd) = get_eframe_hwnd() {
         unsafe {
             use windows::Win32::UI::WindowsAndMessaging::{
-                BringWindowToTop, SW_SHOW, SetForegroundWindow, ShowWindow,
+                GWL_EXSTYLE, GetWindowLongW, SW_HIDE, SW_SHOWMINNOACTIVE, SetWindowLongW,
+                ShowWindow, WS_EX_TOOLWINDOW,
             };
-            // SW_SHOW is the counterpart to SW_HIDE. SW_RESTORE only works on
-            // minimized/maximized windows, not hidden ones.
-            let _ = ShowWindow(hwnd, SW_SHOW);
-            let _ = BringWindowToTop(hwnd);
-            let _ = SetForegroundWindow(hwnd);
+            // 1. Hide the window (briefly invisible).
+            let _ = ShowWindow(hwnd, SW_HIDE);
+            // 2. Add TOOLWINDOW style → removes taskbar button.
+            let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+            SetWindowLongW(hwnd, GWL_EXSTYLE, (ex | WS_EX_TOOLWINDOW.0) as i32);
+            // 3. Show minimized (no activation). The window exists for winit
+            //    but has no taskbar button and no visible UI.
+            let _ = ShowWindow(hwnd, SW_SHOWMINNOACTIVE);
         }
     }
 }
 
-/// Retrieve the native HWND from the egui context via raw-window-handle.
-fn get_eframe_hwnd(_ctx: &egui::Context) -> Option<windows::Win32::Foundation::HWND> {
+/// Find the eframe window by its title.
+fn get_eframe_hwnd() -> Option<windows::Win32::Foundation::HWND> {
     unsafe {
         use windows::Win32::UI::WindowsAndMessaging::FindWindowW;
         use windows::core::w;
