@@ -1,4 +1,3 @@
-# DisplayWarp
 ![DisplayWarp](https://raw.githubusercontent.com/snakkarike/DisplayWarp/main/assets/DisplayWarpLogo.svg)
 
 #### Launch any application on any monitor, every time. Move live windows instantly.
