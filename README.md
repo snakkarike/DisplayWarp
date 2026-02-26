@@ -4,7 +4,7 @@
 
 ##### A lightweight Windows tray utility that intercepts app launches and warps windows to your preferred display — no more fighting the primary monitor monopoly.
 
-[Download Latest Release](#) · [Quick Start](#quick-start) · [Building from Source](#building-from-source)
+[Download Latest Release](#https://github.com/snakkarike/DisplayWarp/releases/tag/v1.0.0) · [Quick Start](#quick-start) · [Building from Source](#building-from-source)
 
 ---
 
