@@ -1,4 +1,3 @@
-# DisplayWarp
 ![DisplayWarp](https://raw.githubusercontent.com/snakkarike/DisplayWarp/main/assets/DisplayWarpLogo.svg)
 
 #### Launch any application on any monitor, every time. Move live windows instantly.
@@ -10,7 +9,7 @@
 [![Google Gemini](https://img.shields.io/badge/Google%20Gemini-886FBF?logo=googlegemini&logoColor=fff)](#)
 ![Rust](https://img.shields.io/badge/Rust-000000?style=flat&logo=rust&logoColor=white)
 
-[Download Latest Release](https://github.com/snakkarike/DisplayWarp/releases/tag/v1.0.0) · [Quick Start](#quick-start) · [Building from Source](#building-from-source)
+[Download Latest Release](https://github.com/snakkarike/DisplayWarp/releases) · [Quick Start](#quick-start) · [Building from Source](#building-from-source)
 
 ---
 
