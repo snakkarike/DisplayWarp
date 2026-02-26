@@ -27,70 +27,68 @@ impl eframe::App for WindowManagerApp {
         style.visuals.widgets.active.rounding = egui::Rounding::same(6.0);
         ctx.set_style(style);
 
+        // ── Bottom: Log (pinned to bottom) ─────────────────────────────
+        egui::TopBottomPanel::bottom("log_panel")
+            .min_height(40.0)
+            .show(ctx, |ui| {
+                ui.label(
+                    egui::RichText::new(format!("{} Log", regular::NOTE_PENCIL))
+                        .size(14.0)
+                        .strong(),
+                );
+                panels::draw_status_bar(self, ui);
+            });
+
+        // ── Bottom: Move Live Window (above log) ────────────────────────
+        egui::TopBottomPanel::bottom("live_mover_panel").show(ctx, |ui| {
+            ui.add_space(4.0);
+            panels::draw_live_process_mover(self, ui);
+            ui.add_space(4.0);
+        });
+
+        // ── Central: everything else (flex-fills remaining space) ────────
         egui::CentralPanel::default().show(ctx, |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.add_space(4.0);
-                ui.heading(egui::RichText::new("DisplayWarp").size(20.0).strong());
-                ui.add_space(8.0);
+            ui.add_space(4.0);
+            ui.heading(egui::RichText::new("DisplayWarp").size(20.0).strong());
+            ui.add_space(8.0);
 
-                // ── Monitor layout preview ──────────────────────────────
-                let preview_idx = if self.editing_profile_idx.is_some() {
-                    self.edit_profile_mon_idx
-                } else {
-                    self.selected_mon_idx
-                };
-                draw_monitor_preview(self, ui, preview_idx);
+            // Monitor layout preview
+            let preview_idx = if self.editing_profile_idx.is_some() {
+                self.edit_profile_mon_idx
+            } else {
+                self.selected_mon_idx
+            };
+            draw_monitor_preview(self, ui, preview_idx);
 
-                ui.add_space(10.0);
+            ui.add_space(10.0);
 
-                // ── Two-column: New Profiles | Saved Profiles ───────────
-                ui.columns(2, |cols| {
-                    cols[0].group(|ui| {
-                        ui.label(
-                            egui::RichText::new(format!("{} New Profiles", regular::PLUS_CIRCLE))
-                                .size(14.0)
-                                .strong(),
-                        );
-                        ui.add_space(4.0);
-                        panels::draw_new_profile_form(self, ui);
-                    });
-
-                    cols[1].group(|ui| {
-                        ui.label(
-                            egui::RichText::new(format!(
-                                "{} Saved Profiles",
-                                regular::BOOKMARK_SIMPLE
-                            ))
-                            .size(14.0)
-                            .strong(),
-                        );
-                        ui.add_space(4.0);
-                        egui::ScrollArea::vertical()
-                            .max_height(250.0)
-                            .id_salt("saved_profiles_scroll")
-                            .show(ui, |ui| {
-                                panels::draw_profiles_list(self, ui);
-                            });
-                    });
-                });
-
-                ui.add_space(10.0);
-
-                // ── Move Live Window ────────────────────────────────────
-                ui.group(|ui| {
-                    panels::draw_live_process_mover(self, ui);
-                });
-
-                ui.add_space(10.0);
-
-                // ── Log ─────────────────────────────────────────────────
-                ui.group(|ui| {
+            // Two-column: New Profiles | Saved Profiles
+            ui.columns(2, |cols| {
+                cols[0].group(|ui| {
                     ui.label(
-                        egui::RichText::new(format!("{} Log", regular::NOTE_PENCIL))
+                        egui::RichText::new(format!("{} New Profiles", regular::PLUS_CIRCLE))
                             .size(14.0)
                             .strong(),
                     );
-                    panels::draw_status_bar(self, ui);
+                    ui.add_space(4.0);
+                    panels::draw_new_profile_form(self, ui);
+                });
+
+                cols[1].group(|ui| {
+                    ui.label(
+                        egui::RichText::new(format!("{} Saved Profiles", regular::BOOKMARK_SIMPLE))
+                            .size(14.0)
+                            .strong(),
+                    );
+                    ui.add_space(4.0);
+                    // Flex-expand: use all remaining height in this column
+                    let remaining = ui.available_height() - 10.0;
+                    egui::ScrollArea::vertical()
+                        .max_height(remaining.max(80.0))
+                        .id_salt("saved_profiles_scroll")
+                        .show(ui, |ui| {
+                            panels::draw_profiles_list(self, ui);
+                        });
                 });
             });
         });

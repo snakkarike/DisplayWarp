@@ -459,6 +459,7 @@ pub fn draw_status_bar(app: &WindowManagerApp, ui: &mut egui::Ui) {
         .rounding(egui::Rounding::same(4.0))
         .fill(egui::Color32::from_gray(30))
         .show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
             ui.label(egui::RichText::new(&status).small().color(color));
         });
 }
