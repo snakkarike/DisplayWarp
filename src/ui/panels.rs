@@ -385,12 +385,22 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
         .get(app.selected_live_process_idx)
         .map(|e| e.label.as_str())
         .unwrap_or("Select Live Process");
+    let display_label = if current_label.len() > 40 {
+        format!("{}…", &current_label[..39])
+    } else {
+        current_label.to_string()
+    };
     egui::ComboBox::from_id_salt("live_proc")
-        .selected_text(current_label)
+        .selected_text(display_label)
         .width(ui.available_width() - 8.0)
         .show_ui(ui, |ui| {
             for (i, entry) in app.live_processes.iter().enumerate() {
-                ui.selectable_value(&mut app.selected_live_process_idx, i, &entry.label);
+                let label = if entry.label.len() > 60 {
+                    format!("{} {}…", regular::APP_WINDOW, &entry.label[..59])
+                } else {
+                    format!("{} {}", regular::APP_WINDOW, entry.label)
+                };
+                ui.selectable_value(&mut app.selected_live_process_idx, i, label);
             }
         });
 

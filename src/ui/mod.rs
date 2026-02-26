@@ -70,6 +70,8 @@ impl eframe::App for WindowManagerApp {
         // ── Apply dark theme styling ─────────────────────────────────────
         let mut style = (*ctx.style()).clone();
         style.spacing.item_spacing = egui::vec2(8.0, 6.0);
+        style.spacing.button_padding = egui::vec2(10.0, 5.0);
+        style.spacing.combo_height = 300.0;
         style.visuals.widgets.noninteractive.rounding = egui::Rounding::same(6.0);
         style.visuals.widgets.inactive.rounding = egui::Rounding::same(6.0);
         style.visuals.widgets.hovered.rounding = egui::Rounding::same(6.0);

@@ -13,16 +13,30 @@ fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([720.0, 800.0])
-            .with_min_inner_size([600.0, 500.0]),
+            .with_min_inner_size([700.0, 600.0]),
         ..Default::default()
     };
     eframe::run_native(
         "Display Warp",
         options,
         Box::new(move |cc| {
-            // Register Phosphor icon font.
+            // Register fonts.
             let mut fonts = egui::FontDefinitions::default();
+
+            // Geist Sans as primary proportional font.
+            fonts.font_data.insert(
+                "geist".into(),
+                egui::FontData::from_static(include_bytes!("../assets/fonts/Geist-Regular.ttf")),
+            );
+            fonts
+                .families
+                .entry(egui::FontFamily::Proportional)
+                .or_default()
+                .insert(0, "geist".into());
+
+            // Phosphor icons as fallback.
             egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+
             cc.egui_ctx.set_fonts(fonts);
 
             let mut app = app::WindowManagerApp::default();
