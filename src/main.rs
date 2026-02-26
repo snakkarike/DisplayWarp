@@ -17,9 +17,13 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "Display Warp",
         options,
-        Box::new(move |_| {
+        Box::new(move |cc| {
+            // Register Phosphor icon font.
+            let mut fonts = egui::FontDefinitions::default();
+            egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+            cc.egui_ctx.set_fonts(fonts);
+
             let mut app = app::WindowManagerApp::default();
-            // Create tray after app so we can share watcher_running.
             let tray_items = tray::create_tray(app.watcher_running.clone());
             app.tray = Some(tray_items);
             Ok(Box::new(app))

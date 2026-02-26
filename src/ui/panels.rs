@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use eframe::egui;
+use egui_phosphor::regular;
 
 use crate::app::WindowManagerApp;
 use crate::models::{AppProfile, SerializableRect};
@@ -33,7 +34,7 @@ pub fn draw_profiles_list(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     }
 }
 
-// ─── Profile Card (mockup style) ─────────────────────────────────────────────
+// ─── Profile Card ────────────────────────────────────────────────────────────
 
 fn draw_profile_card(
     app: &mut WindowManagerApp,
@@ -50,12 +51,12 @@ fn draw_profile_card(
             ui.horizontal(|ui| {
                 ui.label(egui::RichText::new(&p.name).strong().size(13.0));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    // Display badge
                     let badge_text = format!(
-                        "📺 {}",
+                        "{} {}",
+                        regular::MONITOR,
                         p.target_monitor_name
                             .replace("\\\\.\\", "")
-                            .replace("DISPLAY", "Display ")
+                            .replace("DISPLAY", "Display "),
                     );
                     ui.label(
                         egui::RichText::new(badge_text)
@@ -67,7 +68,7 @@ fn draw_profile_card(
 
             // ── Exe path ──
             ui.label(
-                egui::RichText::new(format!("📁 {}", p.exe_path.display()))
+                egui::RichText::new(format!("{} {}", regular::FOLDER_OPEN, p.exe_path.display()))
                     .small()
                     .color(egui::Color32::GRAY),
             );
@@ -75,7 +76,7 @@ fn draw_profile_card(
             // ── Window process name (if any) ──
             if let Some(proc) = &p.window_process_name {
                 ui.label(
-                    egui::RichText::new(format!("📎 {}", proc))
+                    egui::RichText::new(format!("{} {}", regular::FILE, proc))
                         .small()
                         .color(egui::Color32::GRAY),
                 );
@@ -97,13 +98,19 @@ fn draw_profile_card(
                 let btn_width = (ui.available_width() - 16.0) / 3.0;
 
                 if ui
-                    .add_sized([btn_width, 24.0], egui::Button::new("▷ Launch"))
+                    .add_sized(
+                        [btn_width, 24.0],
+                        egui::Button::new(format!("{} Launch", regular::PLAY)),
+                    )
                     .clicked()
                 {
                     WindowManagerApp::launch_profile(p, Arc::clone(&app.status_message));
                 }
                 if ui
-                    .add_sized([btn_width, 24.0], egui::Button::new("✏ Edit"))
+                    .add_sized(
+                        [btn_width, 24.0],
+                        egui::Button::new(format!("{} Edit", regular::PENCIL_SIMPLE)),
+                    )
                     .clicked()
                 {
                     app.editing_profile_idx = Some(i);
@@ -117,7 +124,10 @@ fn draw_profile_card(
                         p.window_process_name.clone().unwrap_or_default();
                 }
                 if ui
-                    .add_sized([btn_width, 24.0], egui::Button::new("🗑 Delete"))
+                    .add_sized(
+                        [btn_width, 24.0],
+                        egui::Button::new(format!("{} Delete", regular::TRASH)),
+                    )
                     .clicked()
                 {
                     *to_remove = Some(i);
@@ -143,13 +153,16 @@ fn draw_edit_profile_form(
         .stroke(egui::Stroke::new(1.5, egui::Color32::YELLOW))
         .show(ui, |ui| {
             ui.label(
-                egui::RichText::new(format!("✏ Editing: {}", p.name))
+                egui::RichText::new(format!("{} Editing: {}", regular::PENCIL_SIMPLE, p.name))
                     .color(egui::Color32::YELLOW)
                     .strong(),
             );
 
             ui.horizontal(|ui| {
-                if ui.button("📁 Change EXE").clicked() {
+                if ui
+                    .button(format!("{} Change EXE", regular::FOLDER_OPEN))
+                    .clicked()
+                {
                     app.edit_profile_exe = rfd::FileDialog::new()
                         .add_filter("Executable", &["exe"])
                         .pick_file();
@@ -197,7 +210,7 @@ fn draw_edit_profile_form(
             );
 
             ui.horizontal(|ui| {
-                if ui.button("✅ Save").clicked() {
+                if ui.button(format!("{} Save", regular::CHECK)).clicked() {
                     if let Some(idx) = app.editing_profile_idx {
                         if app.edit_profile_mon_idx >= app.monitors.len() {
                             app.edit_profile_mon_idx = 0;
@@ -231,13 +244,13 @@ fn draw_edit_profile_form(
                     app.edit_profile_exe = None;
                     app.edit_profile_window_process.clear();
                 }
-                if ui.button("✖ Cancel").clicked() {
+                if ui.button(format!("{} Cancel", regular::X)).clicked() {
                     app.editing_profile_idx = None;
                     app.edit_profile_exe = None;
                     app.edit_profile_window_process.clear();
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("🗑 Delete").clicked() {
+                    if ui.button(format!("{} Delete", regular::TRASH)).clicked() {
                         *to_remove = Some(i);
                         app.editing_profile_idx = None;
                     }
@@ -253,7 +266,7 @@ fn draw_edit_profile_form(
 pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     // File selector
     ui.horizontal(|ui| {
-        ui.label("📁");
+        ui.label(regular::FOLDER_OPEN);
         if let Some(p) = &app.new_profile_exe {
             ui.label(
                 egui::RichText::new(p.file_name().unwrap().to_string_lossy())
@@ -274,9 +287,7 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     ui.add_space(2.0);
 
     // Monitor selector
-    ui.horizontal(|ui| {
-        ui.label("📺 Select Preferred Monitor");
-    });
+    ui.label(format!("{} Select Preferred Monitor", regular::MONITOR));
     egui::ComboBox::from_id_salt("new_target_mon")
         .selected_text(if app.monitors.is_empty() {
             "No monitors".to_string()
@@ -299,7 +310,7 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     ui.add_space(2.0);
 
     // Window process
-    ui.label("📎 Window Process");
+    ui.label(format!("{} Window Process", regular::FILE));
     ui.add(
         egui::TextEdit::multiline(&mut app.new_profile_window_process)
             .hint_text("e.g. Diablo IV.exe - Leave blank if not needed.")
@@ -314,7 +325,7 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     if ui
         .add_sized(
             [ui.available_width(), 28.0],
-            egui::Button::new("💾 Save Profile"),
+            egui::Button::new(format!("{} Save Profile", regular::FLOPPY_DISK)),
         )
         .clicked()
         && can_save
@@ -351,12 +362,15 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
 pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.label(
-            egui::RichText::new("🖥 Move Live Window")
+            egui::RichText::new(format!("{} Move Live Window", regular::MONITOR))
                 .size(14.0)
                 .strong(),
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button("🔄 Refresh Process List").clicked() {
+            if ui
+                .button(format!("{} Refresh Process List", regular::ARROW_CLOCKWISE))
+                .clicked()
+            {
                 app.refresh_live_processes();
             }
         });
@@ -365,7 +379,7 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     ui.add_space(4.0);
 
     // Window process selector
-    ui.label("📎 Window Process");
+    ui.label(format!("{} Window Process", regular::FILE));
     let current_label = app
         .live_processes
         .get(app.selected_live_process_idx)
@@ -383,7 +397,7 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     ui.add_space(4.0);
 
     // Target monitor selector
-    ui.label("📺 Select Target Monitor");
+    ui.label(format!("{} Select Target Monitor", regular::MONITOR));
     egui::ComboBox::from_id_salt("live_mon")
         .selected_text(if app.monitors.is_empty() {
             "No monitors".to_string()
@@ -410,8 +424,11 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     if ui
         .add_sized(
             [ui.available_width(), 30.0],
-            egui::Button::new(egui::RichText::new("📦 Move Process").strong())
-                .fill(egui::Color32::from_rgb(50, 200, 100)),
+            egui::Button::new(
+                egui::RichText::new(format!("{} Move Process", regular::ARROWS_OUT_SIMPLE))
+                    .strong(),
+            )
+            .fill(egui::Color32::from_rgb(50, 200, 100)),
         )
         .clicked()
         && can_move

@@ -7,6 +7,7 @@ name = "DisplayWarp"
 version = "1.0.0"
 dependencies = [
  "eframe",
+ "egui-phosphor",
  "parking_lot",
  "rfd",
  "serde",
@@ -1041,6 +1042,15 @@ dependencies = [
  "epaint",
  "log",
  "nohash-hasher",
+]
+
+[[package]]
+name = "egui-phosphor"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74744068685d20e004d1a4326c48403b6759e325c7fce8c5eeeab93f0a9f67ca"
+dependencies = [
+ "egui",
 ]
 
 [[package]]

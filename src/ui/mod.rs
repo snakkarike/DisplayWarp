@@ -1,6 +1,7 @@
 pub mod panels;
 
 use eframe::egui;
+use egui_phosphor::regular;
 
 use crate::app::WindowManagerApp;
 
@@ -44,16 +45,25 @@ impl eframe::App for WindowManagerApp {
 
                 // ── Two-column: New Profiles | Saved Profiles ───────────
                 ui.columns(2, |cols| {
-                    // Left column: New Profile form
                     cols[0].group(|ui| {
-                        ui.label(egui::RichText::new("🆕 New Profiles").size(14.0).strong());
+                        ui.label(
+                            egui::RichText::new(format!("{} New Profiles", regular::PLUS_CIRCLE))
+                                .size(14.0)
+                                .strong(),
+                        );
                         ui.add_space(4.0);
                         panels::draw_new_profile_form(self, ui);
                     });
 
-                    // Right column: Saved Profiles
                     cols[1].group(|ui| {
-                        ui.label(egui::RichText::new("💾 Saved Profiles").size(14.0).strong());
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "{} Saved Profiles",
+                                regular::BOOKMARK_SIMPLE
+                            ))
+                            .size(14.0)
+                            .strong(),
+                        );
                         ui.add_space(4.0);
                         egui::ScrollArea::vertical()
                             .max_height(250.0)
@@ -75,7 +85,11 @@ impl eframe::App for WindowManagerApp {
 
                 // ── Log ─────────────────────────────────────────────────
                 ui.group(|ui| {
-                    ui.label(egui::RichText::new("📋 Log").size(14.0).strong());
+                    ui.label(
+                        egui::RichText::new(format!("{} Log", regular::NOTE_PENCIL))
+                            .size(14.0)
+                            .strong(),
+                    );
                     panels::draw_status_bar(self, ui);
                 });
             });
@@ -87,7 +101,6 @@ impl eframe::App for WindowManagerApp {
 
 fn draw_monitor_preview(app: &mut WindowManagerApp, ui: &mut egui::Ui, selected_idx: usize) {
     ui.group(|ui| {
-        // Preview area
         let (rect, _) = ui.allocate_at_least(
             egui::vec2(ui.available_width(), 160.0),
             egui::Sense::hover(),
@@ -134,13 +147,12 @@ fn draw_monitor_preview(app: &mut WindowManagerApp, ui: &mut egui::Ui, selected_
                         ),
                 );
 
-                // Colors matching the mockup
                 let fill = if is_selected {
-                    egui::Color32::from_rgb(50, 200, 100) // green for selected
+                    egui::Color32::from_rgb(50, 200, 100)
                 } else if is_primary {
-                    egui::Color32::from_rgb(0, 100, 200) // blue for primary
+                    egui::Color32::from_rgb(0, 100, 200)
                 } else {
-                    egui::Color32::from_rgb(90, 50, 140) // purple for others
+                    egui::Color32::from_rgb(90, 50, 140)
                 };
 
                 painter.rect_filled(m_rect, 4.0, fill);
@@ -157,7 +169,6 @@ fn draw_monitor_preview(app: &mut WindowManagerApp, ui: &mut egui::Ui, selected_
                     ),
                 );
 
-                // "Resolution" label + resolution
                 let w = m.rect.right - m.rect.left;
                 let h = m.rect.bottom - m.rect.top;
                 painter.text(
@@ -174,12 +185,11 @@ fn draw_monitor_preview(app: &mut WindowManagerApp, ui: &mut egui::Ui, selected_
                     egui::FontId::proportional(11.0),
                     egui::Color32::WHITE,
                 );
-                // Monitor number at bottom-right corner
                 painter.text(
                     egui::pos2(m_rect.right() - 12.0, m_rect.bottom() - 10.0),
                     egui::Align2::CENTER_CENTER,
                     format!("{}", i + 1),
-                    egui::FontId::proportional(13.0).into(),
+                    egui::FontId::proportional(13.0),
                     egui::Color32::WHITE,
                 );
             }
@@ -226,7 +236,10 @@ fn draw_monitor_preview(app: &mut WindowManagerApp, ui: &mut egui::Ui, selected_
             }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("🔄 Refresh Monitor").clicked() {
+                if ui
+                    .button(format!("{} Refresh Monitor", regular::ARROW_CLOCKWISE))
+                    .clicked()
+                {
                     app.refresh_monitors();
                 }
             });
