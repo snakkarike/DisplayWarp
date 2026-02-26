@@ -1,18 +1,21 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use windows::Win32::Foundation::{HWND, RECT};
+use windows::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromWindow};
 
 use crate::models::{AppProfile, MonitorInfo, SavedData};
 use crate::monitor::get_all_monitors;
 use crate::window::{
-    ProcessEntry, list_visible_windows, move_to_monitor, move_window_once, wait_for_window,
-    wait_for_window_by_name,
+    ProcessEntry, find_window_by_process_name, list_visible_windows, move_to_monitor,
+    move_window_once, wait_for_window, wait_for_window_by_name,
 };
 
 // ─── Application State ───────────────────────────────────────────────────────
 
 pub struct WindowManagerApp {
     pub monitors: Vec<MonitorInfo>,
-    pub data: SavedData,
+    /// Shared so the background watcher can read profiles.
+    pub data: Arc<parking_lot::Mutex<SavedData>>,
     // ── New profile form state ──
     pub new_profile_exe: Option<std::path::PathBuf>,
     pub selected_mon_idx: usize,
@@ -26,15 +29,22 @@ pub struct WindowManagerApp {
     pub live_processes: Vec<ProcessEntry>,
     pub selected_live_process_idx: usize,
     pub live_move_mon_idx: usize,
+    // ── Persistent monitor watcher ──
+    pub watcher_running: Arc<AtomicBool>,
+    // ── System tray ──
+    pub tray: Option<crate::tray::TrayItems>,
     // ── Shared ──
     pub status_message: Arc<parking_lot::Mutex<String>>,
 }
 
 impl Default for WindowManagerApp {
     fn default() -> Self {
+        let data = Arc::new(parking_lot::Mutex::new(SavedData::default()));
+        let watcher_running = Arc::new(AtomicBool::new(true));
+
         let mut app = Self {
             monitors: vec![],
-            data: SavedData::default(),
+            data: Arc::clone(&data),
             new_profile_exe: None,
             selected_mon_idx: 0,
             new_profile_window_process: String::new(),
@@ -45,10 +55,16 @@ impl Default for WindowManagerApp {
             live_processes: vec![],
             selected_live_process_idx: 0,
             live_move_mon_idx: 0,
+            watcher_running: Arc::clone(&watcher_running),
+            tray: None,
             status_message: Arc::new(parking_lot::Mutex::new(String::from("Ready."))),
         };
         app.refresh_monitors();
         app.load_data();
+
+        // Start the background watcher thread.
+        Self::start_watcher(Arc::clone(&data), Arc::clone(&watcher_running));
+
         app
     }
 }
@@ -58,8 +74,6 @@ impl Default for WindowManagerApp {
 impl WindowManagerApp {
     pub fn refresh_monitors(&mut self) {
         self.monitors = get_all_monitors();
-        // Clamp all monitor indices so they can't be out-of-bounds if
-        // a monitor was disconnected while the app was running.
         let max = self.monitors.len().saturating_sub(1);
         self.selected_mon_idx = self.selected_mon_idx.min(max);
         self.edit_profile_mon_idx = self.edit_profile_mon_idx.min(max);
@@ -74,13 +88,14 @@ impl WindowManagerApp {
     pub fn load_data(&mut self) {
         if let Ok(bytes) = std::fs::read("monitor_config.json") {
             if let Ok(decoded) = serde_json::from_slice::<SavedData>(&bytes) {
-                self.data = decoded;
+                *self.data.lock() = decoded;
             }
         }
     }
 
     pub fn save_data(&self) {
-        if let Ok(json) = serde_json::to_string_pretty(&self.data) {
+        let data = self.data.lock();
+        if let Ok(json) = serde_json::to_string_pretty(&*data) {
             let _ = std::fs::write("monitor_config.json", json);
         }
     }
@@ -93,13 +108,85 @@ impl WindowManagerApp {
             .map(|m| m.rect)
     }
 
-    /// Launch a profile using the window-moving strategy.
+    // ─── Background watcher ──────────────────────────────────────────────
+
+    /// Spawn a background thread that every 3 seconds checks each profile with
+    /// `persistent_monitor == true`. If the profiled window is on the wrong
+    /// monitor, it moves it.
+    fn start_watcher(data: Arc<parking_lot::Mutex<SavedData>>, running: Arc<AtomicBool>) {
+        std::thread::spawn(move || {
+            while running.load(Ordering::Relaxed) {
+                std::thread::sleep(std::time::Duration::from_secs(3));
+                if !running.load(Ordering::Relaxed) {
+                    break;
+                }
+
+                let profiles: Vec<AppProfile> = { data.lock().profiles.clone() };
+                let monitors = get_all_monitors();
+
+                for profile in &profiles {
+                    if !profile.persistent_monitor {
+                        continue;
+                    }
+                    let proc_name = match &profile.window_process_name {
+                        Some(name) if !name.is_empty() => name.to_lowercase(),
+                        _ => continue, // need a process name to match
+                    };
+
+                    // Try to find the window.
+                    let hwnd = match find_window_by_process_name(&proc_name) {
+                        Some(h) => h,
+                        None => continue, // not running
+                    };
+
+                    // Find the target monitor rect.
+                    let target_rect =
+                        Self::find_monitor_rect(&monitors, &profile.target_monitor_name).or_else(
+                            || {
+                                profile.target_monitor_rect.as_ref().map(|r| RECT {
+                                    left: r.left,
+                                    top: r.top,
+                                    right: r.right,
+                                    bottom: r.bottom,
+                                })
+                            },
+                        );
+                    let target_rect = match target_rect {
+                        Some(r) => r,
+                        None => continue,
+                    };
+
+                    // Check if the window is currently on the right monitor.
+                    let target_mon = unsafe {
+                        use windows::Win32::Foundation::POINT;
+                        use windows::Win32::Graphics::Gdi::MonitorFromPoint;
+                        let w = target_rect.right - target_rect.left;
+                        let h = target_rect.bottom - target_rect.top;
+                        MonitorFromPoint(
+                            POINT {
+                                x: target_rect.left + w / 2,
+                                y: target_rect.top + h / 2,
+                            },
+                            MONITOR_DEFAULTTONEAREST,
+                        )
+                    };
+                    let current_mon = unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
+
+                    if current_mon != target_mon {
+                        move_window_once(hwnd, target_rect);
+                    }
+                }
+            }
+        });
+    }
+
+    // ─── Profile launching ───────────────────────────────────────────────
+
     pub fn launch_profile(profile: &AppProfile, status: Arc<parking_lot::Mutex<String>>) {
         let exe = profile.exe_path.clone();
         let device_name = profile.target_monitor_name.clone();
         let window_process_name = profile.window_process_name.clone();
 
-        // Resolve target rect.
         let live_monitors = get_all_monitors();
         let target_rect = Self::find_monitor_rect(&live_monitors, &device_name).or_else(|| {
             profile.target_monitor_rect.as_ref().map(|r| RECT {
@@ -117,7 +204,6 @@ impl WindowManagerApp {
             }
         };
 
-        // ── Window-moving path ───────────────────────────────────────────────
         let cwd = exe
             .parent()
             .unwrap_or(std::path::Path::new("."))
@@ -151,19 +237,16 @@ impl WindowManagerApp {
         });
     }
 
-    /// Move an already-running window (from the live-process list) to a target monitor rect.
     pub fn move_live_window(
         hwnd: HWND,
         target_rect: RECT,
         status: Arc<parking_lot::Mutex<String>>,
     ) {
         use windows::Win32::UI::WindowsAndMessaging::IsWindow;
-        // Validate before spawning a thread.
         if unsafe { !IsWindow(hwnd).as_bool() } {
             *status.lock() = "❌ Window no longer exists (it may have been closed).".into();
             return;
         }
-        // HWND is not Send, so transmit the raw handle value as isize.
         let hwnd_raw = hwnd.0 as isize;
         std::thread::spawn(move || {
             let hwnd = HWND(hwnd_raw as *mut _);

@@ -6,13 +6,12 @@ use crate::app::WindowManagerApp;
 use crate::models::{AppProfile, SerializableRect};
 
 /// Draw individual profile cards (normal view + inline edit form).
-/// Returns a profile index to remove (if delete was clicked), or None.
 pub fn draw_profiles_list(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     let mut to_remove: Option<usize> = None;
-    let profiles = app.data.profiles.clone();
+    let profiles: Vec<AppProfile> = app.data.lock().profiles.clone();
+
     for (i, p) in profiles.iter().enumerate() {
         let is_editing = app.editing_profile_idx == Some(i);
-
         if is_editing {
             draw_edit_profile_form(app, ui, i, p, &mut to_remove);
         } else {
@@ -20,7 +19,7 @@ pub fn draw_profiles_list(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
         }
     }
     if let Some(i) = to_remove {
-        app.data.profiles.remove(i);
+        app.data.lock().profiles.remove(i);
         app.save_data();
     }
 }
@@ -88,18 +87,17 @@ fn draw_edit_profile_form(
         ui.horizontal(|ui| {
             if ui.button("✅ Save Changes").clicked() {
                 if let Some(idx) = app.editing_profile_idx {
-                    // Guard against stale monitor index after display layout change.
                     if app.edit_profile_mon_idx >= app.monitors.len() {
                         app.edit_profile_mon_idx = 0;
                     }
                     if app.monitors.is_empty() {
-                        // Can't save without monitors — just dismiss the form.
                         app.editing_profile_idx = None;
                         app.edit_profile_exe = None;
                         app.edit_profile_window_process.clear();
                         return;
                     }
-                    let prof = &mut app.data.profiles[idx];
+                    let mut data = app.data.lock();
+                    let prof = &mut data.profiles[idx];
                     if let Some(new_exe) = app.edit_profile_exe.take() {
                         prof.name = new_exe.file_name().unwrap().to_string_lossy().into_owned();
                         prof.exe_path = new_exe;
@@ -114,6 +112,7 @@ fn draw_edit_profile_form(
                     });
                     let proc = app.edit_profile_window_process.trim().to_string();
                     prof.window_process_name = if proc.is_empty() { None } else { Some(proc) };
+                    drop(data);
                     app.save_data();
                 }
                 app.editing_profile_idx = None;
@@ -165,21 +164,31 @@ fn draw_profile_card(
                 }
             });
         });
-        let proc_label = p
-            .window_process_name
-            .as_deref()
-            .map(|s| format!(" | watch: {s}"))
-            .unwrap_or_default();
-        ui.label(
-            egui::RichText::new(format!(
-                "  {} → {}{}",
-                p.exe_path.display(),
-                p.target_monitor_name,
-                proc_label,
-            ))
-            .small()
-            .color(egui::Color32::GRAY),
-        );
+
+        // ── Second row: persistent monitor toggle + details ──
+        ui.horizontal(|ui| {
+            let mut persistent = p.persistent_monitor;
+            if ui.checkbox(&mut persistent, "🔒 Persistent").changed() {
+                app.data.lock().profiles[i].persistent_monitor = persistent;
+                app.save_data();
+            }
+
+            let proc_label = p
+                .window_process_name
+                .as_deref()
+                .map(|s| format!(" | watch: {s}"))
+                .unwrap_or_default();
+            ui.label(
+                egui::RichText::new(format!(
+                    "{} → {}{}",
+                    p.exe_path.display(),
+                    p.target_monitor_name,
+                    proc_label,
+                ))
+                .small()
+                .color(egui::Color32::GRAY),
+            );
+        });
     });
 }
 
@@ -248,7 +257,7 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             let exe = app.new_profile_exe.clone().unwrap();
             let mon = &app.monitors[app.selected_mon_idx];
             let proc_name = app.new_profile_window_process.trim().to_string();
-            app.data.profiles.push(AppProfile {
+            app.data.lock().profiles.push(AppProfile {
                 name: exe.file_name().unwrap().to_string_lossy().into_owned(),
                 exe_path: exe,
                 target_monitor_name: mon.device_name.clone(),
@@ -264,6 +273,7 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                     Some(proc_name)
                 },
                 force_primary: false,
+                persistent_monitor: false,
             });
             app.new_profile_exe = None;
             app.new_profile_window_process.clear();

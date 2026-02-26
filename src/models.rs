@@ -22,6 +22,10 @@ pub struct AppProfile {
     /// primary before launching, then restore after the process exits.
     #[serde(default)]
     pub force_primary: bool,
+    /// When true, the background watcher will continuously enforce that this
+    /// app's window stays on the target monitor.
+    #[serde(default)]
+    pub persistent_monitor: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]

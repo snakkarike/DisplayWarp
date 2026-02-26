@@ -79,7 +79,7 @@ pub fn wait_for_window_by_name(process_name: &str, timeout_ms: u64) -> Option<HW
     }
 }
 
-fn find_window_by_process_name(target_lowercase: &str) -> Option<HWND> {
+pub fn find_window_by_process_name(target_lowercase: &str) -> Option<HWND> {
     let mut data = FindWindowByNameData {
         target_name: target_lowercase.to_string(),
         candidates: Vec::new(),

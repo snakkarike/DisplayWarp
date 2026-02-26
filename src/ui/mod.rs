@@ -1,24 +1,44 @@
 pub mod panels;
 
+use std::sync::atomic::Ordering;
+
 use eframe::egui;
 
 use crate::app::WindowManagerApp;
+use crate::tray;
 
 // ─── eframe App impl ─────────────────────────────────────────────────────────
 
 impl eframe::App for WindowManagerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Poll for status updates from background threads
+        // Keep the event loop alive even when hidden (for tray menu polling).
         ctx.request_repaint_after(std::time::Duration::from_millis(500));
+
+        // ── Handle tray menu events ──────────────────────────────────────
+        if let Some(id) = tray::poll_menu_event() {
+            if let Some(ref tray_items) = self.tray {
+                if id == tray_items.show_id {
+                    show_native_window(ctx);
+                } else if id == tray_items.quit_id {
+                    self.watcher_running.store(false, Ordering::Relaxed);
+                    std::process::exit(0);
+                }
+            }
+        }
+
+        // ── Intercept close → hide to tray ──────────────────────────────
+        // Read the flag FIRST (releases the input lock), then act on it.
+        let close_requested = ctx.input(|i| i.viewport().close_requested());
+        if close_requested {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            hide_native_window(ctx);
+        }
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("DisplayWarp");
             ui.add_space(4.0);
 
             // ── Monitor layout preview ──────────────────────────────────
-            // Highlight the monitor that's active in the current context:
-            //   - while editing a profile → edit_profile_mon_idx
-            //   - otherwise              → selected_mon_idx (new-profile selector)
             let preview_idx = if self.editing_profile_idx.is_some() {
                 self.edit_profile_mon_idx
             } else {
@@ -72,10 +92,51 @@ impl eframe::App for WindowManagerApp {
     }
 }
 
+// ─── Native window show/hide ─────────────────────────────────────────────────
+
+/// Hide the eframe window using the native Win32 API.
+/// We avoid `Visible(false)` because eframe stops processing events for
+/// hidden windows, making it impossible to restore them via tray menu.
+fn hide_native_window(ctx: &egui::Context) {
+    if let Some(hwnd) = get_eframe_hwnd(ctx) {
+        unsafe {
+            use windows::Win32::UI::WindowsAndMessaging::{SW_HIDE, ShowWindow};
+            let _ = ShowWindow(hwnd, SW_HIDE);
+        }
+    }
+}
+
+/// Show the eframe window using the native Win32 API.
+fn show_native_window(ctx: &egui::Context) {
+    if let Some(hwnd) = get_eframe_hwnd(ctx) {
+        unsafe {
+            use windows::Win32::UI::WindowsAndMessaging::{
+                BringWindowToTop, SW_SHOW, SetForegroundWindow, ShowWindow,
+            };
+            // SW_SHOW is the counterpart to SW_HIDE. SW_RESTORE only works on
+            // minimized/maximized windows, not hidden ones.
+            let _ = ShowWindow(hwnd, SW_SHOW);
+            let _ = BringWindowToTop(hwnd);
+            let _ = SetForegroundWindow(hwnd);
+        }
+    }
+}
+
+/// Retrieve the native HWND from the egui context via raw-window-handle.
+fn get_eframe_hwnd(_ctx: &egui::Context) -> Option<windows::Win32::Foundation::HWND> {
+    unsafe {
+        use windows::Win32::UI::WindowsAndMessaging::FindWindowW;
+        use windows::core::w;
+        match FindWindowW(None, w!("Display Warp")) {
+            Ok(hwnd) if !hwnd.0.is_null() => Some(hwnd),
+            _ => None,
+        }
+    }
+}
+
 // ─── Layout Preview ──────────────────────────────────────────────────────────
 
 impl WindowManagerApp {
-    /// `selected_idx` is which monitor slot to highlight green.
     pub fn draw_layout_preview(&self, ui: &mut egui::Ui, selected_idx: usize) {
         let (rect, _) = ui.allocate_at_least(
             egui::vec2(ui.available_width(), 140.0),
