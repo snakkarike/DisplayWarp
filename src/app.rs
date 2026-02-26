@@ -58,6 +58,12 @@ impl Default for WindowManagerApp {
 impl WindowManagerApp {
     pub fn refresh_monitors(&mut self) {
         self.monitors = get_all_monitors();
+        // Clamp all monitor indices so they can't be out-of-bounds if
+        // a monitor was disconnected while the app was running.
+        let max = self.monitors.len().saturating_sub(1);
+        self.selected_mon_idx = self.selected_mon_idx.min(max);
+        self.edit_profile_mon_idx = self.edit_profile_mon_idx.min(max);
+        self.live_move_mon_idx = self.live_move_mon_idx.min(max);
     }
 
     pub fn refresh_live_processes(&mut self) {
@@ -112,7 +118,10 @@ impl WindowManagerApp {
         };
 
         // ── Window-moving path ───────────────────────────────────────────────
-        let cwd = exe.parent().unwrap().to_path_buf();
+        let cwd = exe
+            .parent()
+            .unwrap_or(std::path::Path::new("."))
+            .to_path_buf();
         let child = match std::process::Command::new(&exe).current_dir(&cwd).spawn() {
             Ok(c) => c,
             Err(e) => {
@@ -148,6 +157,12 @@ impl WindowManagerApp {
         target_rect: RECT,
         status: Arc<parking_lot::Mutex<String>>,
     ) {
+        use windows::Win32::UI::WindowsAndMessaging::IsWindow;
+        // Validate before spawning a thread.
+        if unsafe { !IsWindow(hwnd).as_bool() } {
+            *status.lock() = "❌ Window no longer exists (it may have been closed).".into();
+            return;
+        }
         // HWND is not Send, so transmit the raw handle value as isize.
         let hwnd_raw = hwnd.0 as isize;
         std::thread::spawn(move || {

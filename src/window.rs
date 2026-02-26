@@ -9,8 +9,8 @@ use windows::Win32::System::Threading::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BringWindowToTop, EnumWindows, GWL_EXSTYLE, GetWindowLongW, GetWindowPlacement, GetWindowRect,
-    GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HWND_TOP, IsWindowVisible,
-    SW_MAXIMIZE, SW_RESTORE, SW_SHOWMAXIMIZED, SWP_FRAMECHANGED, SWP_SHOWWINDOW,
+    GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HWND_TOP, IsWindow,
+    IsWindowVisible, SW_MAXIMIZE, SW_RESTORE, SW_SHOWMAXIMIZED, SWP_FRAMECHANGED, SWP_SHOWWINDOW,
     SetForegroundWindow, SetWindowPlacement, SetWindowPos, ShowWindow, WINDOWPLACEMENT,
     WS_EX_TOOLWINDOW,
 };
@@ -204,6 +204,12 @@ pub fn move_window_once(hwnd: HWND, target_rect: RECT) {
     let w = target_rect.right - target_rect.left;
     let h = target_rect.bottom - target_rect.top;
     unsafe {
+        // Bail if the window handle is no longer valid (e.g. app closed,
+        // or display layout change destroyed and recreated windows).
+        if !IsWindow(hwnd).as_bool() {
+            return;
+        }
+
         // 1. Read current placement to detect if the window is maximized.
         let mut placement = WINDOWPLACEMENT {
             length: std::mem::size_of::<WINDOWPLACEMENT>() as u32,
@@ -259,6 +265,10 @@ pub fn move_to_monitor(hwnd: HWND, target_rect: RECT) {
     // ── Phase 1: aggressive initial placement (first ~6 s) ────────────────
     for attempt in 0..12u32 {
         unsafe {
+            // Bail if window was destroyed (display change, app closed, etc.)
+            if !IsWindow(hwnd).as_bool() {
+                return;
+            }
             if attempt > 0 {
                 std::thread::sleep(std::time::Duration::from_millis(500));
             }
@@ -290,6 +300,10 @@ pub fn move_to_monitor(hwnd: HWND, target_rect: RECT) {
     while std::time::Instant::now() < watch_deadline {
         std::thread::sleep(std::time::Duration::from_millis(1000));
         unsafe {
+            // Stop watching if window was destroyed.
+            if !IsWindow(hwnd).as_bool() {
+                return;
+            }
             if MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) != target_mon {
                 let _ = BringWindowToTop(hwnd);
                 let _ = SetForegroundWindow(hwnd);

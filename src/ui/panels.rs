@@ -88,6 +88,17 @@ fn draw_edit_profile_form(
         ui.horizontal(|ui| {
             if ui.button("✅ Save Changes").clicked() {
                 if let Some(idx) = app.editing_profile_idx {
+                    // Guard against stale monitor index after display layout change.
+                    if app.edit_profile_mon_idx >= app.monitors.len() {
+                        app.edit_profile_mon_idx = 0;
+                    }
+                    if app.monitors.is_empty() {
+                        // Can't save without monitors — just dismiss the form.
+                        app.editing_profile_idx = None;
+                        app.edit_profile_exe = None;
+                        app.edit_profile_window_process.clear();
+                        return;
+                    }
                     let prof = &mut app.data.profiles[idx];
                     if let Some(new_exe) = app.edit_profile_exe.take() {
                         prof.name = new_exe.file_name().unwrap().to_string_lossy().into_owned();

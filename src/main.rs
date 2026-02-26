@@ -14,7 +14,7 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
     eframe::run_native(
-        "Monitor Launcher",
+        "Display Warp",
         options,
         Box::new(|_| Ok(Box::new(app::WindowManagerApp::default()))),
     )
