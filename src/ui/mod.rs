@@ -11,11 +11,60 @@ impl eframe::App for WindowManagerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.request_repaint_after(std::time::Duration::from_millis(500));
 
-        // ── Intercept close → hide to tray ──────────────────────────────
+        // ── Intercept close → show confirmation dialog ──────────────────
         let close_requested = ctx.input(|i| i.viewport().close_requested());
         if close_requested {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            hide_native_window(ctx);
+            self.show_close_dialog = true;
+        }
+
+        // ── Close confirmation popup ─────────────────────────────────────
+        if self.show_close_dialog {
+            egui::Area::new(egui::Id::new("close_dialog_overlay"))
+                .fixed_pos(egui::pos2(0.0, 0.0))
+                .show(ctx, |ui| {
+                    let screen = ctx.screen_rect();
+                    let (rect, _) = ui.allocate_exact_size(screen.size(), egui::Sense::click());
+                    ui.painter()
+                        .rect_filled(rect, 0.0, egui::Color32::from_black_alpha(120));
+                });
+
+            egui::Window::new("Close DisplayWarp?")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .show(ctx, |ui| {
+                    ui.add_space(4.0);
+                    ui.label("What would you like to do?");
+                    ui.add_space(8.0);
+                    ui.horizontal(|ui| {
+                        if ui
+                            .add_sized(
+                                [140.0, 30.0],
+                                egui::Button::new(format!("{} Minimize to Tray", regular::TRAY)),
+                            )
+                            .clicked()
+                        {
+                            self.show_close_dialog = false;
+                            hide_native_window(ctx);
+                        }
+                        ui.add_space(8.0);
+                        if ui
+                            .add_sized(
+                                [100.0, 30.0],
+                                egui::Button::new(format!("{} Quit", regular::POWER))
+                                    .fill(egui::Color32::from_rgb(180, 50, 50)),
+                            )
+                            .clicked()
+                        {
+                            self.show_close_dialog = false;
+                            self.watcher_running
+                                .store(false, std::sync::atomic::Ordering::Relaxed);
+                            std::process::exit(0);
+                        }
+                    });
+                    ui.add_space(4.0);
+                });
         }
 
         // ── Apply dark theme styling ─────────────────────────────────────

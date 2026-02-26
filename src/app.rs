@@ -33,6 +33,8 @@ pub struct WindowManagerApp {
     pub watcher_running: Arc<AtomicBool>,
     // ── System tray ──
     pub tray: Option<crate::tray::TrayItems>,
+    // ── Close dialog ──
+    pub show_close_dialog: bool,
     // ── Shared ──
     pub status_message: Arc<parking_lot::Mutex<String>>,
 }
@@ -57,6 +59,7 @@ impl Default for WindowManagerApp {
             live_move_mon_idx: 0,
             watcher_running: Arc::clone(&watcher_running),
             tray: None,
+            show_close_dialog: false,
             status_message: Arc::new(parking_lot::Mutex::new(String::from("Ready."))),
         };
         app.refresh_monitors();
