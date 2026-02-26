@@ -8,10 +8,11 @@ use windows::Win32::System::Threading::{
     QueryFullProcessImageNameW, WaitForSingleObject,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    BringWindowToTop, EnumWindows, GWL_EXSTYLE, GetWindowLongW, GetWindowRect,
+    BringWindowToTop, EnumWindows, GWL_EXSTYLE, GetWindowLongW, GetWindowPlacement, GetWindowRect,
     GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HWND_TOP, IsWindowVisible,
-    SW_MAXIMIZE, SW_RESTORE, SWP_FRAMECHANGED, SWP_SHOWWINDOW, SetForegroundWindow, SetWindowPos,
-    ShowWindow, WS_EX_TOOLWINDOW,
+    SW_MAXIMIZE, SW_RESTORE, SW_SHOWMAXIMIZED, SWP_FRAMECHANGED, SWP_SHOWWINDOW,
+    SetForegroundWindow, SetWindowPlacement, SetWindowPos, ShowWindow, WINDOWPLACEMENT,
+    WS_EX_TOOLWINDOW,
 };
 
 // ─── Public types ─────────────────────────────────────────────────────────────
@@ -196,15 +197,38 @@ fn monitor_for_rect(rect: RECT) -> HMONITOR {
 }
 
 /// Move a window to the target monitor rect in a single, non-flickering operation.
-/// For live (already-running) windows. No retry loop, no watcher, no SW_MAXIMIZE/RESTORE.
+/// Uses SetWindowPlacement to update Windows' internal monitor tracking (so
+/// minimize/maximize stays on the right screen) AND SetWindowPos for the
+/// immediate visual move.
 pub fn move_window_once(hwnd: HWND, target_rect: RECT) {
     let w = target_rect.right - target_rect.left;
     let h = target_rect.bottom - target_rect.top;
     unsafe {
-        // SetWindowPos alone can reposition any window including maximized ones.
-        // Do NOT call SW_RESTORE first — it snaps a maximized window back to its
-        // pre-maximize position (on the old monitor) before the new SetWindowPos
-        // fires, causing a visible double-jump on every move.
+        // 1. Read current placement to detect if the window is maximized.
+        let mut placement = WINDOWPLACEMENT {
+            length: std::mem::size_of::<WINDOWPLACEMENT>() as u32,
+            ..Default::default()
+        };
+        let _ = GetWindowPlacement(hwnd, &mut placement);
+        let was_maximized = placement.showCmd == SW_MAXIMIZE.0 as u32
+            || placement.showCmd == SW_SHOWMAXIMIZED.0 as u32;
+
+        // 2. Update the "normal" (restored) position to be inside the target monitor.
+        //    This is what Windows uses to decide which monitor to maximize on.
+        let win_w = (w * 3) / 4;
+        let win_h = (h * 3) / 4;
+        let win_x = target_rect.left + (w - win_w) / 2;
+        let win_y = target_rect.top + (h - win_h) / 2;
+        placement.rcNormalPosition = RECT {
+            left: win_x,
+            top: win_y,
+            right: win_x + win_w,
+            bottom: win_y + win_h,
+        };
+        placement.showCmd = SW_RESTORE.0 as u32;
+        let _ = SetWindowPlacement(hwnd, &placement);
+
+        // 3. Visually move the window with SetWindowPos.
         let _ = SetWindowPos(
             hwnd,
             HWND_TOP,
@@ -214,6 +238,12 @@ pub fn move_window_once(hwnd: HWND, target_rect: RECT) {
             h,
             SWP_SHOWWINDOW | SWP_FRAMECHANGED,
         );
+
+        // 4. If it was maximized, re-maximize on the new monitor.
+        if was_maximized {
+            let _ = ShowWindow(hwnd, SW_MAXIMIZE);
+        }
+
         let _ = BringWindowToTop(hwnd);
         let _ = SetForegroundWindow(hwnd);
     }
