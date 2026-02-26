@@ -44,8 +44,10 @@ fn draw_profile_card(
     to_remove: &mut Option<usize>,
 ) {
     egui::Frame::group(ui.style())
-        .inner_margin(egui::Margin::same(8.0))
-        .rounding(egui::Rounding::same(6.0))
+        .inner_margin(egui::Margin::same(12.0))
+        .rounding(egui::Rounding::same(8.0))
+        .fill(egui::Color32::from_rgb(34, 34, 34))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
         .show(ui, |ui| {
             // ── Header: name + display badge ──
             ui.horizontal(|ui| {
@@ -100,7 +102,8 @@ fn draw_profile_card(
                 if ui
                     .add_sized(
                         [btn_width, 24.0],
-                        egui::Button::new(format!("{} Launch", regular::PLAY)),
+                        egui::Button::new(format!("{} Launch", regular::PLAY))
+                            .fill(egui::Color32::from_rgb(7, 7, 7)),
                     )
                     .clicked()
                 {
@@ -109,7 +112,8 @@ fn draw_profile_card(
                 if ui
                     .add_sized(
                         [btn_width, 24.0],
-                        egui::Button::new(format!("{} Edit", regular::PENCIL_SIMPLE)),
+                        egui::Button::new(format!("{} Edit", regular::PENCIL_SIMPLE))
+                            .fill(egui::Color32::from_rgb(7, 7, 7)),
                     )
                     .clicked()
                 {
@@ -127,7 +131,8 @@ fn draw_profile_card(
                 if ui
                     .add_sized(
                         [btn_width, 24.0],
-                        egui::Button::new(format!("{} Delete", regular::TRASH)),
+                        egui::Button::new(format!("{} Delete", regular::TRASH))
+                            .fill(egui::Color32::from_rgb(7, 7, 7)),
                     )
                     .clicked()
                 {
@@ -149,9 +154,13 @@ fn draw_edit_profile_form(
     to_remove: &mut Option<usize>,
 ) {
     egui::Frame::group(ui.style())
-        .inner_margin(egui::Margin::same(8.0))
-        .rounding(egui::Rounding::same(6.0))
-        .stroke(egui::Stroke::new(1.5, egui::Color32::YELLOW))
+        .inner_margin(egui::Margin::same(12.0))
+        .rounding(egui::Rounding::same(8.0))
+        .fill(egui::Color32::from_rgb(45, 45, 35)) // Slight tint for editing
+        .stroke(egui::Stroke::new(
+            1.5,
+            egui::Color32::from_rgb(200, 180, 50),
+        ))
         .show(ui, |ui| {
             ui.label(
                 egui::RichText::new(format!("{} Editing Profile", regular::PENCIL_SIMPLE))
@@ -159,67 +168,128 @@ fn draw_edit_profile_form(
                     .strong(),
             );
 
-            ui.horizontal(|ui| {
-                ui.label("Name:");
-                ui.add(
-                    egui::TextEdit::singleline(&mut app.edit_profile_name)
-                        .desired_width(f32::INFINITY),
-                );
-            });
+            egui::Frame::none()
+                .inner_margin(egui::Margin::same(8.0))
+                .rounding(egui::Rounding::same(6.0))
+                .fill(egui::Color32::from_rgb(34, 34, 34))
+                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+                .show(ui, |ui| {
+                    ui.label(
+                        egui::RichText::new(format!("{} Profile Name", regular::PENCIL_SIMPLE))
+                            .strong(),
+                    );
+                    ui.add_space(4.0);
+                    ui.add(
+                        egui::TextEdit::singleline(&mut app.edit_profile_name)
+                            .desired_width(f32::INFINITY),
+                    );
+                });
+
+            ui.add_space(2.0);
+
+            egui::Frame::none()
+                .inner_margin(egui::Margin::same(8.0))
+                .rounding(egui::Rounding::same(6.0))
+                .fill(egui::Color32::from_rgb(34, 34, 34))
+                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(regular::FOLDER_OPEN);
+                        let shown = app
+                            .edit_profile_exe
+                            .as_ref()
+                            .map(|e| e.file_name().unwrap().to_string_lossy().into_owned())
+                            .unwrap_or_else(|| {
+                                p.exe_path
+                                    .file_name()
+                                    .unwrap()
+                                    .to_string_lossy()
+                                    .into_owned()
+                            });
+                        ui.label(egui::RichText::new(shown).color(egui::Color32::LIGHT_GREEN));
+
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui
+                                .add(
+                                    egui::Button::new(
+                                        egui::RichText::new("Change EXE")
+                                            .strong()
+                                            .color(egui::Color32::WHITE),
+                                    )
+                                    .fill(egui::Color32::from_rgb(7, 7, 7)),
+                                )
+                                .clicked()
+                            {
+                                app.edit_profile_exe = rfd::FileDialog::new()
+                                    .add_filter("Executable", &["exe"])
+                                    .pick_file();
+                            }
+                        });
+                    });
+                });
+
+            ui.add_space(2.0);
+
+            egui::Frame::none()
+                .inner_margin(egui::Margin::same(8.0))
+                .rounding(egui::Rounding::same(6.0))
+                .fill(egui::Color32::from_rgb(34, 34, 34))
+                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+                .show(ui, |ui| {
+                    ui.label(
+                        egui::RichText::new(format!("{} Target monitor", regular::MONITOR))
+                            .strong(),
+                    );
+                    ui.add_space(4.0);
+                    egui::ComboBox::from_id_salt(format!("edit_mon_{i}"))
+                        .selected_text(if app.monitors.is_empty() {
+                            "No monitors".to_string()
+                        } else {
+                            format!("Monitor {}", app.edit_profile_mon_idx + 1)
+                        })
+                        .width(ui.available_width() - 8.0)
+                        .show_ui(ui, |ui| {
+                            for (mi, m) in app.monitors.iter().enumerate() {
+                                let w = m.rect.right - m.rect.left;
+                                let h = m.rect.bottom - m.rect.top;
+                                ui.selectable_value(
+                                    &mut app.edit_profile_mon_idx,
+                                    mi,
+                                    format!("Monitor {} ({}×{})", mi + 1, w, h),
+                                );
+                            }
+                        });
+                });
+
+            ui.add_space(2.0);
+
+            egui::Frame::none()
+                .inner_margin(egui::Margin::same(8.0))
+                .rounding(egui::Rounding::same(6.0))
+                .fill(egui::Color32::from_rgb(34, 34, 34))
+                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+                .show(ui, |ui| {
+                    ui.label(
+                        egui::RichText::new(format!("{} Window process", regular::FILE)).strong(),
+                    );
+                    ui.add_space(4.0);
+                    ui.add(
+                        egui::TextEdit::singleline(&mut app.edit_profile_window_process)
+                            .hint_text("e.g. Diablo IV.exe")
+                            .desired_width(f32::INFINITY),
+                    );
+                });
+
+            ui.add_space(4.0);
 
             ui.horizontal(|ui| {
                 if ui
-                    .button(format!("{} Change EXE", regular::FOLDER_OPEN))
+                    .add(
+                        egui::Button::new(format!("{} Save", regular::CHECK))
+                            .fill(egui::Color32::from_rgb(7, 7, 7)),
+                    )
                     .clicked()
                 {
-                    app.edit_profile_exe = rfd::FileDialog::new()
-                        .add_filter("Executable", &["exe"])
-                        .pick_file();
-                }
-                let shown = app
-                    .edit_profile_exe
-                    .as_ref()
-                    .map(|e| e.file_name().unwrap().to_string_lossy().into_owned())
-                    .unwrap_or_else(|| {
-                        p.exe_path
-                            .file_name()
-                            .unwrap()
-                            .to_string_lossy()
-                            .into_owned()
-                    });
-                ui.label(egui::RichText::new(shown).color(egui::Color32::LIGHT_GREEN));
-            });
-
-            ui.horizontal(|ui| {
-                ui.label("Target monitor:");
-                egui::ComboBox::from_id_salt(format!("edit_mon_{i}"))
-                    .selected_text(if app.monitors.is_empty() {
-                        "No monitors".to_string()
-                    } else {
-                        format!("Monitor {}", app.edit_profile_mon_idx + 1)
-                    })
-                    .show_ui(ui, |ui| {
-                        for (mi, m) in app.monitors.iter().enumerate() {
-                            let w = m.rect.right - m.rect.left;
-                            let h = m.rect.bottom - m.rect.top;
-                            ui.selectable_value(
-                                &mut app.edit_profile_mon_idx,
-                                mi,
-                                format!("Monitor {} ({}×{})", mi + 1, w, h),
-                            );
-                        }
-                    });
-            });
-
-            ui.label("Window process (optional):");
-            ui.add(
-                egui::TextEdit::singleline(&mut app.edit_profile_window_process)
-                    .hint_text("e.g. Diablo IV.exe")
-                    .desired_width(f32::INFINITY),
-            );
-
-            ui.horizontal(|ui| {
-                if ui.button(format!("{} Save", regular::CHECK)).clicked() {
                     if let Some(idx) = app.editing_profile_idx {
                         if app.edit_profile_mon_idx >= app.monitors.len() {
                             app.edit_profile_mon_idx = 0;
@@ -253,13 +323,25 @@ fn draw_edit_profile_form(
                     app.edit_profile_exe = None;
                     app.edit_profile_window_process.clear();
                 }
-                if ui.button(format!("{} Cancel", regular::X)).clicked() {
+                if ui
+                    .add(
+                        egui::Button::new(format!("{} Cancel", regular::X))
+                            .fill(egui::Color32::from_rgb(7, 7, 7)),
+                    )
+                    .clicked()
+                {
                     app.editing_profile_idx = None;
                     app.edit_profile_exe = None;
                     app.edit_profile_window_process.clear();
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button(format!("{} Delete", regular::TRASH)).clicked() {
+                    if ui
+                        .add(
+                            egui::Button::new(format!("{} Delete", regular::TRASH))
+                                .fill(egui::Color32::from_rgb(7, 7, 7)),
+                        )
+                        .clicked()
+                    {
                         *to_remove = Some(i);
                         app.editing_profile_idx = None;
                     }
@@ -274,75 +356,122 @@ fn draw_edit_profile_form(
 
 pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     // File selector
-    ui.horizontal(|ui| {
-        ui.label(regular::FOLDER_OPEN);
-        if let Some(p) = &app.new_profile_exe {
-            ui.label(
-                egui::RichText::new(p.file_name().unwrap().to_string_lossy())
-                    .color(egui::Color32::LIGHT_GREEN),
-            );
-        } else {
-            ui.label(egui::RichText::new("No File Selected").color(egui::Color32::GRAY));
-        }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button("Select EXE").clicked() {
-                if let Some(path) = rfd::FileDialog::new()
-                    .add_filter("Executable", &["exe"])
-                    .pick_file()
-                {
-                    app.new_profile_exe = Some(path.clone());
-                    if app.new_profile_name.is_empty() {
-                        app.new_profile_name =
-                            path.file_name().unwrap().to_string_lossy().into_owned();
-                    }
+    egui::Frame::none()
+        .inner_margin(egui::Margin::same(8.0))
+        .rounding(egui::Rounding::same(6.0))
+        .fill(egui::Color32::from_rgb(34, 34, 34))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(regular::FOLDER_OPEN);
+                if let Some(p) = &app.new_profile_exe {
+                    ui.label(
+                        egui::RichText::new(p.file_name().unwrap().to_string_lossy())
+                            .color(egui::Color32::LIGHT_GREEN),
+                    );
+                } else {
+                    ui.label(
+                        egui::RichText::new("No File Selected")
+                            .color(egui::Color32::GRAY)
+                            .strong(),
+                    );
                 }
-            }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .button(
+                            egui::RichText::new("Select EXE")
+                                .strong()
+                                .color(egui::Color32::WHITE),
+                        )
+                        .clicked()
+                    {
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("Executable", &["exe"])
+                            .pick_file()
+                        {
+                            app.new_profile_exe = Some(path.clone());
+                            if app.new_profile_name.is_empty() {
+                                app.new_profile_name =
+                                    path.file_name().unwrap().to_string_lossy().into_owned();
+                            }
+                        }
+                    }
+                });
+            });
         });
-    });
 
     ui.add_space(2.0);
 
     // Profile Name
-    ui.label(format!("{} Profile Name", regular::PENCIL_SIMPLE));
-    ui.add(
-        egui::TextEdit::singleline(&mut app.new_profile_name)
-            .hint_text("Enter profile name")
-            .desired_width(f32::INFINITY),
-    );
+    egui::Frame::none()
+        .inner_margin(egui::Margin::same(8.0))
+        .rounding(egui::Rounding::same(6.0))
+        .fill(egui::Color32::from_rgb(34, 34, 34))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+        .show(ui, |ui| {
+            ui.label(
+                egui::RichText::new(format!("{} Profile Name", regular::PENCIL_SIMPLE)).strong(),
+            );
+            ui.add_space(4.0);
+            ui.add(
+                egui::TextEdit::singleline(&mut app.new_profile_name)
+                    .hint_text("Enter profile name")
+                    .desired_width(f32::INFINITY),
+            );
+        });
 
     ui.add_space(2.0);
 
     // Monitor selector
-    ui.label(format!("{} Select Preferred Monitor", regular::MONITOR));
-    egui::ComboBox::from_id_salt("new_target_mon")
-        .selected_text(if app.monitors.is_empty() {
-            "No monitors".to_string()
-        } else {
-            format!("Monitor {}", app.selected_mon_idx + 1)
-        })
-        .width(ui.available_width() - 8.0)
-        .show_ui(ui, |ui| {
-            for (i, m) in app.monitors.iter().enumerate() {
-                let w = m.rect.right - m.rect.left;
-                let h = m.rect.bottom - m.rect.top;
-                ui.selectable_value(
-                    &mut app.selected_mon_idx,
-                    i,
-                    format!("Monitor {} ({}×{})", i + 1, w, h),
-                );
-            }
+    egui::Frame::none()
+        .inner_margin(egui::Margin::same(8.0))
+        .rounding(egui::Rounding::same(6.0))
+        .fill(egui::Color32::from_rgb(34, 34, 34))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+        .show(ui, |ui| {
+            ui.label(
+                egui::RichText::new(format!("{} Select Preferred Monitor", regular::MONITOR))
+                    .strong(),
+            );
+            ui.add_space(4.0);
+            egui::ComboBox::from_id_salt("new_target_mon")
+                .selected_text(if app.monitors.is_empty() {
+                    "No monitors".to_string()
+                } else {
+                    format!("Monitor {}", app.selected_mon_idx + 1)
+                })
+                .width(ui.available_width() - 8.0)
+                .show_ui(ui, |ui| {
+                    for (i, m) in app.monitors.iter().enumerate() {
+                        let w = m.rect.right - m.rect.left;
+                        let h = m.rect.bottom - m.rect.top;
+                        ui.selectable_value(
+                            &mut app.selected_mon_idx,
+                            i,
+                            format!("Monitor {} ({}×{})", i + 1, w, h),
+                        );
+                    }
+                });
         });
 
     ui.add_space(2.0);
 
     // Window process
-    ui.label(format!("{} Window Process", regular::FILE));
-    ui.add(
-        egui::TextEdit::multiline(&mut app.new_profile_window_process)
-            .hint_text("e.g. Diablo IV.exe - Leave blank if not needed.")
-            .desired_width(f32::INFINITY)
-            .desired_rows(2),
-    );
+    egui::Frame::none()
+        .inner_margin(egui::Margin::same(8.0))
+        .rounding(egui::Rounding::same(6.0))
+        .fill(egui::Color32::from_rgb(34, 34, 34))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+        .show(ui, |ui| {
+            ui.label(egui::RichText::new(format!("{} Window Process", regular::FILE)).strong());
+            ui.add_space(4.0);
+            ui.add(
+                egui::TextEdit::multiline(&mut app.new_profile_window_process)
+                    .hint_text("e.g. Diablo IV.exe - Leave blank if not needed.")
+                    .desired_width(f32::INFINITY)
+                    .desired_rows(2),
+            );
+        });
 
     ui.add_space(4.0);
 
@@ -353,7 +482,8 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     if ui
         .add_sized(
             [ui.available_width(), 28.0],
-            egui::Button::new(format!("{} Save Profile", regular::FLOPPY_DISK)),
+            egui::Button::new(format!("{} Save Profile", regular::FLOPPY_DISK))
+                .fill(egui::Color32::from_rgb(7, 7, 7)),
         )
         .clicked()
         && can_save
@@ -397,7 +527,10 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui
-                .button(format!("{} Refresh Process List", regular::ARROW_CLOCKWISE))
+                .add(
+                    egui::Button::new(format!("{} Refresh Process List", regular::ARROW_CLOCKWISE))
+                        .fill(egui::Color32::from_rgb(7, 7, 7)),
+                )
                 .clicked()
             {
                 app.refresh_live_processes();
@@ -408,55 +541,73 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     ui.add_space(4.0);
 
     // Window process selector
-    ui.label(format!("{} Window Process", regular::FILE));
-    let current_label = app
-        .live_processes
-        .get(app.selected_live_process_idx)
-        .map(|e| e.label.as_str())
-        .unwrap_or("Select Live Process");
-    let display_label = if current_label.len() > 40 {
-        format!("{}…", &current_label[..39])
-    } else {
-        current_label.to_string()
-    };
-    ui.add_enabled_ui(!app.live_processes.is_empty(), |ui| {
-        egui::ComboBox::from_id_salt("live_proc")
-            .selected_text(display_label)
-            .width(ui.available_width() - 8.0)
-            .height(300.0)
-            .show_ui(ui, |ui| {
-                for (i, entry) in app.live_processes.iter().enumerate() {
-                    let label = if entry.label.len() > 60 {
-                        format!("{} {}…", regular::APP_WINDOW, &entry.label[..59])
-                    } else {
-                        format!("{} {}", regular::APP_WINDOW, entry.label)
-                    };
-                    ui.selectable_value(&mut app.selected_live_process_idx, i, label);
-                }
+    egui::Frame::none()
+        .inner_margin(egui::Margin::same(8.0))
+        .rounding(egui::Rounding::same(6.0))
+        .fill(egui::Color32::from_rgb(34, 34, 34))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+        .show(ui, |ui| {
+            ui.label(egui::RichText::new(format!("{} Window Process", regular::FILE)).strong());
+            ui.add_space(4.0);
+            let current_label = app
+                .live_processes
+                .get(app.selected_live_process_idx)
+                .map(|e| e.label.as_str())
+                .unwrap_or("Select Live Process");
+            let display_label = if current_label.len() > 40 {
+                format!("{}…", &current_label[..39])
+            } else {
+                current_label.to_string()
+            };
+            ui.add_enabled_ui(!app.live_processes.is_empty(), |ui| {
+                egui::ComboBox::from_id_salt("live_proc")
+                    .selected_text(display_label)
+                    .width(ui.available_width() - 8.0)
+                    .height(300.0)
+                    .show_ui(ui, |ui| {
+                        for (i, entry) in app.live_processes.iter().enumerate() {
+                            let label = if entry.label.len() > 60 {
+                                format!("{} {}…", regular::APP_WINDOW, &entry.label[..59])
+                            } else {
+                                format!("{} {}", regular::APP_WINDOW, entry.label)
+                            };
+                            ui.selectable_value(&mut app.selected_live_process_idx, i, label);
+                        }
+                    });
             });
-    });
+        });
 
     ui.add_space(4.0);
 
     // Target monitor selector
-    ui.label(format!("{} Select Target Monitor", regular::MONITOR));
-    egui::ComboBox::from_id_salt("live_mon")
-        .selected_text(if app.monitors.is_empty() {
-            "No monitors".to_string()
-        } else {
-            format!("Monitor {}", app.live_move_mon_idx + 1)
-        })
-        .width(ui.available_width() - 8.0)
-        .show_ui(ui, |ui| {
-            for (i, m) in app.monitors.iter().enumerate() {
-                let w = m.rect.right - m.rect.left;
-                let h = m.rect.bottom - m.rect.top;
-                ui.selectable_value(
-                    &mut app.live_move_mon_idx,
-                    i,
-                    format!("Monitor {} ({}×{})", i + 1, w, h),
-                );
-            }
+    egui::Frame::none()
+        .inner_margin(egui::Margin::same(8.0))
+        .rounding(egui::Rounding::same(6.0))
+        .fill(egui::Color32::from_rgb(34, 34, 34))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+        .show(ui, |ui| {
+            ui.label(
+                egui::RichText::new(format!("{} Select Target Monitor", regular::MONITOR)).strong(),
+            );
+            ui.add_space(4.0);
+            egui::ComboBox::from_id_salt("live_mon")
+                .selected_text(if app.monitors.is_empty() {
+                    "No monitors".to_string()
+                } else {
+                    format!("Monitor {}", app.live_move_mon_idx + 1)
+                })
+                .width(ui.available_width() - 8.0)
+                .show_ui(ui, |ui| {
+                    for (i, m) in app.monitors.iter().enumerate() {
+                        let w = m.rect.right - m.rect.left;
+                        let h = m.rect.bottom - m.rect.top;
+                        ui.selectable_value(
+                            &mut app.live_move_mon_idx,
+                            i,
+                            format!("Monitor {} ({}×{})", i + 1, w, h),
+                        );
+                    }
+                });
         });
 
     ui.add_space(6.0);
@@ -473,7 +624,7 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                     egui::RichText::new(format!("{} Move Process", regular::ARROWS_OUT_SIMPLE))
                         .strong(),
                 )
-                .fill(egui::Color32::from_rgb(50, 200, 100)),
+                .fill(egui::Color32::from_rgb(7, 7, 7)), // overriding previous explicit fill
             )
             .clicked()
             && can_move
@@ -491,7 +642,7 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                 egui::Button::new(
                     egui::RichText::new(format!("{} Create Profile", regular::PLUS)).strong(),
                 )
-                .fill(egui::Color32::from_rgb(50, 100, 200)),
+                .fill(egui::Color32::from_rgb(7, 7, 7)), // overriding previous explicit fill
             )
             .clicked()
             && can_move

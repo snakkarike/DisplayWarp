@@ -76,11 +76,16 @@ impl eframe::App for WindowManagerApp {
         style.visuals.widgets.inactive.rounding = egui::Rounding::same(6.0);
         style.visuals.widgets.hovered.rounding = egui::Rounding::same(6.0);
         style.visuals.widgets.active.rounding = egui::Rounding::same(6.0);
+
+        style.visuals.window_fill = egui::Color32::from_rgb(14, 14, 14);
+        style.visuals.panel_fill = egui::Color32::from_rgb(14, 14, 14);
+        style.visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(7, 7, 7);
+
         ctx.set_style(style);
 
         // ── Bottom: Log (pinned to bottom) ─────────────────────────────
         egui::TopBottomPanel::bottom("log_panel")
-            .min_height(40.0)
+            .min_height(65.0)
             .show(ctx, |ui| {
                 ui.label(
                     egui::RichText::new(format!("{} Log", regular::NOTE_PENCIL))
@@ -92,7 +97,7 @@ impl eframe::App for WindowManagerApp {
 
         // ── Central: everything else (flex-fills remaining space) ────────
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.add_space(4.0);
+            // ui.add_space(4.0);
 
             // Lazy-load the logo texture on first frame.
             // if self.logo_texture.is_none() {
@@ -121,40 +126,70 @@ impl eframe::App for WindowManagerApp {
             };
             draw_monitor_preview(self, ui, preview_idx);
 
-            ui.add_space(10.0);
+            ui.add_space(8.0);
 
             // Two-column: New Profiles + Live Mover | Saved Profiles
             ui.columns(2, |cols| {
-                cols[0].group(|ui| {
-                    ui.label(
-                        egui::RichText::new(format!("{} New Profiles", regular::PLUS_CIRCLE))
-                            .size(14.0)
-                            .strong(),
-                    );
-                    ui.add_space(4.0);
-                    panels::draw_new_profile_form(self, ui);
+                cols[0].vertical(|ui| {
+                    // Outer frame for New Profiles
+                    egui::Frame::group(ui.style())
+                        .inner_margin(egui::Margin::same(12.0))
+                        .rounding(egui::Rounding::same(8.0))
+                        .fill(egui::Color32::from_rgb(25, 25, 25))
+                        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+                        .show(ui, |ui| {
+                            ui.set_width(ui.available_width());
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "{} New Profiles",
+                                    regular::PLUS_CIRCLE
+                                ))
+                                .size(14.0)
+                                .strong(),
+                            );
+                            ui.add_space(8.0);
+                            panels::draw_new_profile_form(self, ui);
+                        });
 
-                    ui.add_space(10.0);
-                    ui.separator();
-                    ui.add_space(4.0);
+                    ui.add_space(8.0);
 
-                    panels::draw_live_process_mover(self, ui);
+                    // Outer frame for Move Live Window
+                    egui::Frame::group(ui.style())
+                        .inner_margin(egui::Margin::same(12.0))
+                        .rounding(egui::Rounding::same(8.0))
+                        .fill(egui::Color32::from_rgb(25, 25, 25))
+                        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+                        .show(ui, |ui| {
+                            ui.set_width(ui.available_width());
+                            panels::draw_live_process_mover(self, ui);
+                        });
                 });
 
-                cols[1].group(|ui| {
-                    ui.label(
-                        egui::RichText::new(format!("{} Saved Profiles", regular::BOOKMARK_SIMPLE))
-                            .size(14.0)
-                            .strong(),
-                    );
-                    ui.add_space(4.0);
-                    // Flex-expand: use all remaining height in this column
-                    let remaining = ui.available_height() - 10.0;
-                    egui::ScrollArea::vertical()
-                        .max_height(remaining.max(80.0))
-                        .id_salt("saved_profiles_scroll")
+                cols[1].vertical(|ui| {
+                    egui::Frame::group(ui.style())
+                        .inner_margin(egui::Margin::same(12.0))
+                        .rounding(egui::Rounding::same(8.0))
+                        .fill(egui::Color32::from_rgb(25, 25, 25))
+                        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
                         .show(ui, |ui| {
-                            panels::draw_profiles_list(self, ui);
+                            ui.set_width(ui.available_width());
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "{} Saved Profiles",
+                                    regular::BOOKMARK_SIMPLE
+                                ))
+                                .size(14.0)
+                                .strong(),
+                            );
+                            ui.add_space(8.0);
+                            // Flex-expand: use all remaining height in this column
+                            let remaining = ui.available_height() - 10.0;
+                            egui::ScrollArea::vertical()
+                                .max_height(remaining.max(80.0))
+                                .id_salt("saved_profiles_scroll")
+                                .show(ui, |ui| {
+                                    panels::draw_profiles_list(self, ui);
+                                });
                         });
                 });
             });
@@ -165,151 +200,161 @@ impl eframe::App for WindowManagerApp {
 // ─── Monitor Preview ─────────────────────────────────────────────────────────
 
 fn draw_monitor_preview(app: &mut WindowManagerApp, ui: &mut egui::Ui, selected_idx: usize) {
-    ui.group(|ui| {
-        let (rect, _) = ui.allocate_at_least(
-            egui::vec2(ui.available_width(), 160.0),
-            egui::Sense::hover(),
-        );
-        let painter = ui.painter_at(rect);
-
-        if app.monitors.is_empty() {
-            painter.text(
-                rect.center(),
-                egui::Align2::CENTER_CENTER,
-                "No monitors detected",
-                egui::FontId::proportional(14.0),
-                egui::Color32::GRAY,
+    egui::Frame::group(ui.style())
+        .inner_margin(egui::Margin::same(12.0))
+        .rounding(egui::Rounding::same(8.0))
+        .fill(egui::Color32::from_rgb(25, 25, 25))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+        .show(ui, |ui| {
+            let (rect, _) = ui.allocate_at_least(
+                egui::vec2(ui.available_width(), 160.0),
+                egui::Sense::hover(),
             );
-        } else {
-            let min_x = app.monitors.iter().map(|m| m.rect.left).min().unwrap_or(0);
-            let max_x = app.monitors.iter().map(|m| m.rect.right).max().unwrap_or(1);
-            let min_y = app.monitors.iter().map(|m| m.rect.top).min().unwrap_or(0);
-            let max_y = app
-                .monitors
-                .iter()
-                .map(|m| m.rect.bottom)
-                .max()
-                .unwrap_or(1);
+            let painter = ui.painter_at(rect);
 
-            let width = (max_x - min_x) as f32;
-            let height = (max_y - min_y) as f32;
-            let scale = (rect.width() / width).min(rect.height() / height) * 0.85;
-            let center = rect.center();
+            if app.monitors.is_empty() {
+                painter.text(
+                    rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    "No monitors detected",
+                    egui::FontId::proportional(14.0),
+                    egui::Color32::GRAY,
+                );
+            } else {
+                let min_x = app.monitors.iter().map(|m| m.rect.left).min().unwrap_or(0);
+                let max_x = app.monitors.iter().map(|m| m.rect.right).max().unwrap_or(1);
+                let min_y = app.monitors.iter().map(|m| m.rect.top).min().unwrap_or(0);
+                let max_y = app
+                    .monitors
+                    .iter()
+                    .map(|m| m.rect.bottom)
+                    .max()
+                    .unwrap_or(1);
 
-            for (i, m) in app.monitors.iter().enumerate() {
-                let is_selected = i == selected_idx;
-                let is_primary = m.rect.left == 0 && m.rect.top == 0;
-                let m_rect = egui::Rect::from_min_max(
-                    center
-                        + egui::vec2(
-                            (m.rect.left - min_x) as f32 * scale - (width * scale / 2.0),
-                            (m.rect.top - min_y) as f32 * scale - (height * scale / 2.0),
+                let width = (max_x - min_x) as f32;
+                let height = (max_y - min_y) as f32;
+                let scale = (rect.width() / width).min(rect.height() / height) * 0.85;
+                let center = rect.center();
+
+                for (i, m) in app.monitors.iter().enumerate() {
+                    let is_selected = i == selected_idx;
+                    let is_primary = m.rect.left == 0 && m.rect.top == 0;
+                    let m_rect = egui::Rect::from_min_max(
+                        center
+                            + egui::vec2(
+                                (m.rect.left - min_x) as f32 * scale - (width * scale / 2.0),
+                                (m.rect.top - min_y) as f32 * scale - (height * scale / 2.0),
+                            ),
+                        center
+                            + egui::vec2(
+                                (m.rect.right - min_x) as f32 * scale - (width * scale / 2.0),
+                                (m.rect.bottom - min_y) as f32 * scale - (height * scale / 2.0),
+                            ),
+                    );
+
+                    let fill = if is_selected {
+                        egui::Color32::from_rgb(20, 83, 45) // #14532D
+                    } else if is_primary {
+                        egui::Color32::from_rgb(76, 29, 149) // #4C1D95
+                    } else {
+                        egui::Color32::from_rgb(30, 41, 59) // #1E293B
+                    };
+
+                    painter.rect_filled(m_rect, 4.0, fill);
+                    painter.rect_stroke(
+                        m_rect,
+                        4.0,
+                        egui::Stroke::new(
+                            if is_selected { 2.5 } else { 1.5 },
+                            if is_selected {
+                                egui::Color32::from_rgb(34, 197, 94) // Brighter green for selected stroke
+                            } else {
+                                egui::Color32::from_white_alpha(40)
+                            },
                         ),
-                    center
-                        + egui::vec2(
-                            (m.rect.right - min_x) as f32 * scale - (width * scale / 2.0),
-                            (m.rect.bottom - min_y) as f32 * scale - (height * scale / 2.0),
-                        ),
-                );
+                    );
 
-                let fill = if is_selected {
-                    egui::Color32::from_rgb(50, 200, 100)
-                } else if is_primary {
-                    egui::Color32::from_rgb(0, 100, 200)
-                } else {
-                    egui::Color32::from_rgb(90, 50, 140)
-                };
-
-                painter.rect_filled(m_rect, 4.0, fill);
-                painter.rect_stroke(
-                    m_rect,
-                    4.0,
-                    egui::Stroke::new(
-                        if is_selected { 2.5 } else { 1.5 },
-                        if is_selected {
-                            egui::Color32::from_rgb(100, 255, 150)
-                        } else {
-                            egui::Color32::from_white_alpha(80)
-                        },
-                    ),
-                );
-
-                let w = m.rect.right - m.rect.left;
-                let h = m.rect.bottom - m.rect.top;
-                painter.text(
-                    m_rect.center() + egui::vec2(0.0, -8.0),
-                    egui::Align2::CENTER_CENTER,
-                    "Resolution",
-                    egui::FontId::proportional(10.0),
-                    egui::Color32::from_white_alpha(180),
-                );
-                painter.text(
-                    m_rect.center() + egui::vec2(0.0, 6.0),
-                    egui::Align2::CENTER_CENTER,
-                    format!("{}×{}", w, h),
-                    egui::FontId::proportional(11.0),
-                    egui::Color32::WHITE,
-                );
-                painter.text(
-                    egui::pos2(m_rect.right() - 12.0, m_rect.bottom() - 10.0),
-                    egui::Align2::CENTER_CENTER,
-                    format!("{}", i + 1),
-                    egui::FontId::proportional(13.0),
-                    egui::Color32::WHITE,
-                );
-            }
-        }
-
-        // Legend row
-        ui.horizontal(|ui| {
-            ui.add_space(ui.available_width() - 260.0);
-            let (dot_rect, _) = ui.allocate_exact_size(egui::vec2(8.0, 8.0), egui::Sense::hover());
-            ui.painter().circle_filled(
-                dot_rect.center(),
-                4.0,
-                egui::Color32::from_rgb(50, 200, 100),
-            );
-            ui.label(egui::RichText::new("Selected Monitor").small());
-
-            let (dot_rect2, _) = ui.allocate_exact_size(egui::vec2(8.0, 8.0), egui::Sense::hover());
-            ui.painter().circle_filled(
-                dot_rect2.center(),
-                4.0,
-                egui::Color32::from_rgb(0, 100, 200),
-            );
-            ui.label(egui::RichText::new("Primary Monitor").small());
-        });
-
-        // Monitor selector buttons
-        ui.horizontal(|ui| {
-            for (i, m) in app.monitors.iter().enumerate() {
-                let w = m.rect.right - m.rect.left;
-                let h = m.rect.bottom - m.rect.top;
-                let label = format!("Monitor {} ({}×{})", i + 1, w, h);
-                let is_selected = i == app.selected_mon_idx;
-
-                let btn = if is_selected {
-                    egui::Button::new(egui::RichText::new(&label).color(egui::Color32::WHITE))
-                        .fill(egui::Color32::from_rgb(50, 200, 100))
-                } else {
-                    egui::Button::new(&label)
-                };
-
-                if ui.add(btn).clicked() {
-                    app.selected_mon_idx = i;
+                    let w = m.rect.right - m.rect.left;
+                    let h = m.rect.bottom - m.rect.top;
+                    painter.text(
+                        m_rect.center() + egui::vec2(0.0, -8.0),
+                        egui::Align2::CENTER_CENTER,
+                        "Resolution",
+                        egui::FontId::proportional(10.0),
+                        egui::Color32::from_white_alpha(180),
+                    );
+                    painter.text(
+                        m_rect.center() + egui::vec2(0.0, 6.0),
+                        egui::Align2::CENTER_CENTER,
+                        format!("{}×{}", w, h),
+                        egui::FontId::proportional(11.0),
+                        egui::Color32::WHITE,
+                    );
+                    painter.text(
+                        egui::pos2(m_rect.right() - 12.0, m_rect.bottom() - 10.0),
+                        egui::Align2::CENTER_CENTER,
+                        format!("{}", i + 1),
+                        egui::FontId::proportional(13.0),
+                        egui::Color32::WHITE,
+                    );
                 }
             }
 
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui
-                    .button(format!("{} Refresh Monitor", regular::ARROW_CLOCKWISE))
-                    .clicked()
-                {
-                    app.refresh_monitors();
+            // Legend row
+            ui.horizontal(|ui| {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(egui::RichText::new("Primary Monitor").size(12.0));
+                    let (dot_rect2, _) =
+                        ui.allocate_exact_size(egui::vec2(10.0, 10.0), egui::Sense::hover());
+                    ui.painter().circle_filled(
+                        dot_rect2.center(),
+                        5.0,
+                        egui::Color32::from_rgb(76, 29, 149),
+                    );
+
+                    ui.add_space(8.0);
+
+                    ui.label(egui::RichText::new("Selected Monitor").size(12.0));
+                    let (dot_rect, _) =
+                        ui.allocate_exact_size(egui::vec2(10.0, 10.0), egui::Sense::hover());
+                    ui.painter().circle_filled(
+                        dot_rect.center(),
+                        5.0,
+                        egui::Color32::from_rgb(20, 83, 45),
+                    );
+                });
+            });
+
+            // Monitor selector buttons
+            ui.horizontal(|ui| {
+                for (i, m) in app.monitors.iter().enumerate() {
+                    let w = m.rect.right - m.rect.left;
+                    let h = m.rect.bottom - m.rect.top;
+                    let label = format!("Monitor {} ({}×{})", i + 1, w, h);
+                    let is_selected = i == app.selected_mon_idx;
+
+                    let btn = if is_selected {
+                        egui::Button::new(egui::RichText::new(&label).color(egui::Color32::WHITE))
+                            .fill(egui::Color32::from_rgb(20, 83, 45)) // Selected button to match monitor color
+                    } else {
+                        egui::Button::new(&label)
+                    };
+
+                    if ui.add(btn).clicked() {
+                        app.selected_mon_idx = i;
+                    }
                 }
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .button(format!("{} Refresh Monitor", regular::ARROW_CLOCKWISE))
+                        .clicked()
+                    {
+                        app.refresh_monitors();
+                    }
+                });
             });
         });
-    });
 }
 
 // ─── Native window hide (for minimize-to-tray) ──────────────────────────────
