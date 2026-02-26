@@ -5,6 +5,7 @@
 ##### A lightweight Windows tray utility that intercepts app launches and warps windows to your preferred display — no more fighting the primary monitor monopoly.
 
 ![Release](https://img.shields.io/github/v/release/snakkarike/DisplayWarp)
+![License](https://img.shields.io/github/license/snakkarike/DisplayWarp)
 ![Rust](https://img.shields.io/badge/Rust-000000?style=flat&logo=rust&logoColor=white)
 
 [Download Latest Release](https://github.com/snakkarike/DisplayWarp/releases/tag/v1.0.0) · [Quick Start](#quick-start) · [Building from Source](#building-from-source)
