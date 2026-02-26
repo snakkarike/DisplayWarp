@@ -11,13 +11,13 @@ mod window;
 use eframe::egui;
 
 fn main() -> eframe::Result {
-    // Render the SVG icon for the window titlebar.
-    let icon_rgba =
-        svg_render::svg_to_rgba(include_bytes!("../assets/DisplayWarpIcon.svg"), 32, 32);
+    // Decode the PNG icon for the window titlebar.
+    let (icon_rgba, w, h) =
+        svg_render::png_to_rgba(include_bytes!("../assets/DisplayWarpIcon.png"));
     let icon = egui::IconData {
         rgba: icon_rgba,
-        width: 32,
-        height: 32,
+        width: w,
+        height: h,
     };
 
     let options = eframe::NativeOptions {

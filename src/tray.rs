@@ -4,11 +4,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tray_icon::menu::{Menu, MenuEvent, MenuItem};
 use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
-/// Render the DisplayWarp SVG icon at 32×32 for the tray.
+/// Decode the DisplayWarp PNG icon for the tray.
 fn tray_icon() -> Icon {
-    let rgba =
-        crate::svg_render::svg_to_rgba(include_bytes!("../assets/DisplayWarpIcon.svg"), 32, 32);
-    Icon::from_rgba(rgba, 32, 32).expect("failed to create tray icon")
+    let (rgba, w, h) =
+        crate::svg_render::png_to_rgba(include_bytes!("../assets/DisplayWarpIcon.png"));
+    Icon::from_rgba(rgba, w, h).expect("failed to create tray icon")
 }
 
 pub struct TrayItems {
