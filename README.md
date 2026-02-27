@@ -90,7 +90,7 @@ You can edit this file by hand — changes take effect on next launch.
 | Win32         | [windows-rs](https://github.com/microsoft/windows-rs)                                                     |
 | Serialization | [serde](https://serde.rs) + serde_json                                                                    |
 | File dialogs  | [rfd](https://github.com/PolyMeilex/rfd)                                                                  |
-| Icons         | [egui-phosphor](https://github.com/lucasmerlin/egui-phosphor)                                             |
+| Icons         | [egui-phosphor](https://github.com/amperl/egui-phosphor)                                                  |
 
 ---
 
