@@ -8,7 +8,7 @@ OriginalFilename = "DisplayWarp.exe"
 LegalCopyright = "Copyright © 2026"
 ProductVersion = "1.0.5"
 FileVersion = "1.0.5"
-FileDescription = "Launch any application on any monitor, every time. Move live windows instantly."
+FileDescription = "DisplayWarp"
 CompanyName = "GradeLabs"
 ProductName = "DisplayWarp"
 
