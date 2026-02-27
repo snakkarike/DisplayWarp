@@ -4,12 +4,12 @@
 
 ##### Windows is notoriously bad at remembering which monitor you want your apps to open on. DisplayWarp is a lightweight system tray utility that fixes this "primary monitor monopoly" by intercepting app launches and forcing them onto the display of your choice.
 
-![Release](https://img.shields.io/github/v/release/snakkarike/DisplayWarp)
+[![Release](https://img.shields.io/github/v/release/snakkarike/DisplayWarp)](https://github.com/snakkarike/DisplayWarp/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Google Gemini](https://img.shields.io/badge/Google%20Gemini-886FBF?logo=googlegemini&logoColor=fff)](#)
 ![Rust](https://img.shields.io/badge/Rust-000000?style=flat&logo=rust&logoColor=white)
 
-[Download Latest Release](https://github.com/snakkarike/DisplayWarp/releases) · [Quick Start](#quick-start) · [Building from Source](#building-from-source)
+[Quick Start](#quick-start) · [Building from Source](#building-from-source)
 
 ---
 
