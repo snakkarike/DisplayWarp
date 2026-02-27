@@ -1,11 +1,7 @@
-use std::{env, io};
-use winresource::WindowsResource;
-
-fn main() -> io::Result<()> {
-    if env::var_os("CARGO_CFG_WINDOWS").is_some() {
-        WindowsResource::new()
-            .set_icon("assets/DisplayWarpIcon.ico")
-            .compile()?;
+fn main() {
+    if std::env::var("CARGO_CFG_TARGET_OS").unwrap() == "windows" {
+        let mut res = winresource::WindowsResource::new();
+        res.set_icon("DisplayWarpIcon.ico");
+        res.compile().unwrap();
     }
-    Ok(())
 }
