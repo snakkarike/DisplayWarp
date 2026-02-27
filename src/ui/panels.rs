@@ -754,9 +754,13 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             && can_move
         {
             if let Some(entry) = app.live_processes.get(app.selected_live_process_idx) {
-                let hwnd = entry.hwnd;
+                let hwnd = windows::Win32::Foundation::HWND(entry.hwnd as *mut _);
                 let target = app.monitors[app.live_move_mon_idx].rect;
-                WindowManagerApp::move_live_window(hwnd, target, Arc::clone(&app.status_message));
+                WindowManagerApp::move_live_window(
+                    hwnd,
+                    target.into(),
+                    Arc::clone(&app.status_message),
+                );
             }
         }
 

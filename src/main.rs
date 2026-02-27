@@ -3,6 +3,7 @@
 mod app;
 mod models;
 mod monitor;
+mod server;
 mod svg_render;
 mod tray;
 mod ui;
@@ -11,6 +12,21 @@ mod window;
 use eframe::egui;
 
 fn main() -> eframe::Result {
+    // 1. Set DPI Awareness (Per-Monitor V2) so we see actual physical pixels
+    // instead of virtualized scaled coordinates.
+    unsafe {
+        use windows::Win32::UI::HiDpi::{
+            DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext,
+        };
+        let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    }
+
+    // Start the Web Bridge server in a background thread.
+    std::thread::spawn(|| {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(server::start_server());
+    });
+
     // Decode the PNG icon for the window titlebar.
     let (icon_rgba, w, h) =
         svg_render::png_to_rgba(include_bytes!("../assets/DisplayWarpIcon.png"));

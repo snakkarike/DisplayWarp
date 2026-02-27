@@ -39,7 +39,7 @@ unsafe extern "system" fn enum_monitor_callback(
                 .trim_matches(char::from(0))
                 .to_string();
             monitors.push(MonitorInfo {
-                rect: info.monitorInfo.rcMonitor,
+                rect: info.monitorInfo.rcMonitor.into(),
                 device_name,
             });
         }

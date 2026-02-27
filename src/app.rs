@@ -119,7 +119,7 @@ impl WindowManagerApp {
         monitors
             .iter()
             .find(|m| m.device_name == device_name)
-            .map(|m| m.rect)
+            .map(|m| m.rect.into())
     }
 
     // ─── Background watcher ──────────────────────────────────────────────

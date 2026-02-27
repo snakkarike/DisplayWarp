@@ -1,7 +1,7 @@
 use std::ptr;
-use windows::Win32::Foundation::{HWND, LPARAM, POINT, RECT};
+use windows::Win32::Foundation::{HWND, LPARAM, RECT};
 use windows::Win32::Graphics::Gdi::{
-    HMONITOR, MONITOR_DEFAULTTONEAREST, MonitorFromPoint, MonitorFromWindow,
+    HMONITOR, MONITOR_DEFAULTTONEAREST, MonitorFromRect, MonitorFromWindow,
 };
 use windows::Win32::System::Threading::{
     OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE,
@@ -18,10 +18,12 @@ use windows::core::BOOL;
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
+use serde::{Deserialize, Serialize};
+
 /// A visible top-level window that can be moved by the user.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ProcessEntry {
-    pub hwnd: HWND,
+    pub hwnd: isize,
     #[allow(dead_code)]
     pub pid: u32,
     /// Full path to the executable, if it could be retrieved
@@ -184,19 +186,9 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
     }
 }
 
-/// Resolve the HMONITOR for the centre of a rect.
+/// Resolve the HMONITOR for a rect.
 fn monitor_for_rect(rect: RECT) -> HMONITOR {
-    let w = rect.right - rect.left;
-    let h = rect.bottom - rect.top;
-    unsafe {
-        MonitorFromPoint(
-            POINT {
-                x: rect.left + w / 2,
-                y: rect.top + h / 2,
-            },
-            MONITOR_DEFAULTTONEAREST,
-        )
-    }
+    unsafe { MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST) }
 }
 
 /// Move a window to the target monitor rect in a single, non-flickering operation.
@@ -268,17 +260,43 @@ pub fn move_to_monitor(hwnd: HWND, target_rect: RECT) {
     // ── Phase 1: aggressive initial placement (first ~6 s) ────────────────
     for attempt in 0..12u32 {
         unsafe {
-            // Bail if window was destroyed (display change, app closed, etc.)
             if !IsWindow(Some(hwnd)).as_bool() {
                 return;
             }
             if attempt > 0 {
                 std::thread::sleep(std::time::Duration::from_millis(500));
             }
+
+            // 1. Force restore and update placement so Windows knows which monitor we are on
+            let mut placement = WINDOWPLACEMENT {
+                length: std::mem::size_of::<WINDOWPLACEMENT>() as u32,
+                ..Default::default()
+            };
+            if GetWindowPlacement(hwnd, &mut placement).is_err() {
+                println!(
+                    "move_to_monitor: Failed to get window placement for {:?}",
+                    hwnd
+                );
+            }
+
+            // Set the restored position to be on the target monitor
+            let win_w = (w * 3) / 4;
+            let win_h = (h * 3) / 4;
+            let win_x = target_rect.left + (w - win_w) / 2;
+            let win_y = target_rect.top + (h - win_h) / 2;
+            placement.rcNormalPosition = RECT {
+                left: win_x,
+                top: win_y,
+                right: win_x + win_w,
+                bottom: win_y + win_h,
+            };
+            placement.showCmd = SW_RESTORE.0 as u32;
+            let _ = SetWindowPlacement(hwnd, &placement);
+
             let _ = BringWindowToTop(hwnd);
             let _ = SetForegroundWindow(hwnd);
-            let _ = ShowWindow(hwnd, SW_RESTORE);
-            std::thread::sleep(std::time::Duration::from_millis(60));
+
+            // 2. Immediate visual move
             let _ = SetWindowPos(
                 hwnd,
                 Some(HWND_TOP),
@@ -288,8 +306,11 @@ pub fn move_to_monitor(hwnd: HWND, target_rect: RECT) {
                 h,
                 SWP_SHOWWINDOW | SWP_FRAMECHANGED,
             );
+
+            // 3. Re-maximize on the new monitor
             let _ = ShowWindow(hwnd, SW_MAXIMIZE);
-            std::thread::sleep(std::time::Duration::from_millis(100));
+
+            std::thread::sleep(std::time::Duration::from_millis(150));
             if MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) == target_mon {
                 break;
             }
@@ -410,7 +431,7 @@ unsafe extern "system" fn enum_visible_windows_callback(hwnd: HWND, lparam: LPAR
 
         let entries = &mut *(lparam.0 as *mut Vec<ProcessEntry>);
         entries.push(ProcessEntry {
-            hwnd,
+            hwnd: hwnd.0 as isize,
             pid,
             exe_path,
             label: format!("{exe_name} — {title}"),
