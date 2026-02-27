@@ -44,8 +44,8 @@ fn draw_profile_card(
     to_remove: &mut Option<usize>,
 ) {
     egui::Frame::group(ui.style())
-        .inner_margin(egui::Margin::same(12.0))
-        .rounding(egui::Rounding::same(8.0))
+        .inner_margin(egui::Margin::same(12))
+        .corner_radius(egui::CornerRadius::same(8))
         .fill(egui::Color32::from_rgb(34, 34, 34))
         .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
         .show(ui, |ui| {
@@ -154,8 +154,8 @@ fn draw_edit_profile_form(
     to_remove: &mut Option<usize>,
 ) {
     egui::Frame::group(ui.style())
-        .inner_margin(egui::Margin::same(12.0))
-        .rounding(egui::Rounding::same(8.0))
+        .inner_margin(egui::Margin::same(12))
+        .corner_radius(egui::CornerRadius::same(8))
         .fill(egui::Color32::from_rgb(45, 45, 35)) // Slight tint for editing
         .stroke(egui::Stroke::new(
             1.5,
@@ -168,9 +168,9 @@ fn draw_edit_profile_form(
                     .strong(),
             );
 
-            egui::Frame::none()
-                .inner_margin(egui::Margin::same(8.0))
-                .rounding(egui::Rounding::same(6.0))
+            egui::Frame::NONE
+                .inner_margin(egui::Margin::same(8))
+                .corner_radius(egui::CornerRadius::same(6))
                 .fill(egui::Color32::from_rgb(34, 34, 34))
                 .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
                 .show(ui, |ui| {
@@ -187,9 +187,9 @@ fn draw_edit_profile_form(
 
             ui.add_space(2.0);
 
-            egui::Frame::none()
-                .inner_margin(egui::Margin::same(8.0))
-                .rounding(egui::Rounding::same(6.0))
+            egui::Frame::NONE
+                .inner_margin(egui::Margin::same(8))
+                .corner_radius(egui::CornerRadius::same(6))
                 .fill(egui::Color32::from_rgb(34, 34, 34))
                 .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
                 .show(ui, |ui| {
@@ -230,9 +230,9 @@ fn draw_edit_profile_form(
 
             ui.add_space(2.0);
 
-            egui::Frame::none()
-                .inner_margin(egui::Margin::same(8.0))
-                .rounding(egui::Rounding::same(6.0))
+            egui::Frame::NONE
+                .inner_margin(egui::Margin::same(8))
+                .corner_radius(egui::CornerRadius::same(6))
                 .fill(egui::Color32::from_rgb(34, 34, 34))
                 .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
                 .show(ui, |ui| {
@@ -263,9 +263,9 @@ fn draw_edit_profile_form(
 
             ui.add_space(2.0);
 
-            egui::Frame::none()
-                .inner_margin(egui::Margin::same(8.0))
-                .rounding(egui::Rounding::same(6.0))
+            egui::Frame::NONE
+                .inner_margin(egui::Margin::same(8))
+                .corner_radius(egui::CornerRadius::same(6))
                 .fill(egui::Color32::from_rgb(34, 34, 34))
                 .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
                 .show(ui, |ui| {
@@ -356,9 +356,9 @@ fn draw_edit_profile_form(
 
 pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     // File selector
-    egui::Frame::none()
-        .inner_margin(egui::Margin::same(8.0))
-        .rounding(egui::Rounding::same(6.0))
+    egui::Frame::NONE
+        .inner_margin(egui::Margin::same(8))
+        .corner_radius(egui::CornerRadius::same(6))
         .fill(egui::Color32::from_rgb(34, 34, 34))
         .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
         .show(ui, |ui| {
@@ -403,9 +403,9 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     ui.add_space(2.0);
 
     // Profile Name
-    egui::Frame::none()
-        .inner_margin(egui::Margin::same(8.0))
-        .rounding(egui::Rounding::same(6.0))
+    egui::Frame::NONE
+        .inner_margin(egui::Margin::same(8))
+        .corner_radius(egui::CornerRadius::same(6))
         .fill(egui::Color32::from_rgb(34, 34, 34))
         .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
         .show(ui, |ui| {
@@ -423,9 +423,9 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     ui.add_space(2.0);
 
     // Monitor selector
-    egui::Frame::none()
-        .inner_margin(egui::Margin::same(8.0))
-        .rounding(egui::Rounding::same(6.0))
+    egui::Frame::NONE
+        .inner_margin(egui::Margin::same(8))
+        .corner_radius(egui::CornerRadius::same(6))
         .fill(egui::Color32::from_rgb(34, 34, 34))
         .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
         .show(ui, |ui| {
@@ -457,9 +457,9 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     ui.add_space(2.0);
 
     // Window process
-    egui::Frame::none()
-        .inner_margin(egui::Margin::same(8.0))
-        .rounding(egui::Rounding::same(6.0))
+    egui::Frame::NONE
+        .inner_margin(egui::Margin::same(8))
+        .corner_radius(egui::CornerRadius::same(6))
         .fill(egui::Color32::from_rgb(34, 34, 34))
         .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
         .show(ui, |ui| {
@@ -541,9 +541,9 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     ui.add_space(4.0);
 
     // Window process selector
-    egui::Frame::none()
-        .inner_margin(egui::Margin::same(8.0))
-        .rounding(egui::Rounding::same(6.0))
+    egui::Frame::NONE
+        .inner_margin(egui::Margin::same(8))
+        .corner_radius(egui::CornerRadius::same(6))
         .fill(egui::Color32::from_rgb(34, 34, 34))
         .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
         .show(ui, |ui| {
@@ -580,9 +580,9 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     ui.add_space(4.0);
 
     // Target monitor selector
-    egui::Frame::none()
-        .inner_margin(egui::Margin::same(8.0))
-        .rounding(egui::Rounding::same(6.0))
+    egui::Frame::NONE
+        .inner_margin(egui::Margin::same(8))
+        .corner_radius(egui::CornerRadius::same(6))
         .fill(egui::Color32::from_rgb(34, 34, 34))
         .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
         .show(ui, |ui| {
@@ -689,9 +689,9 @@ pub fn draw_status_bar(app: &WindowManagerApp, ui: &mut egui::Ui) {
     } else {
         egui::Color32::GRAY
     };
-    egui::Frame::none()
-        .inner_margin(egui::Margin::same(6.0))
-        .rounding(egui::Rounding::same(4.0))
+    egui::Frame::NONE
+        .inner_margin(egui::Margin::same(6))
+        .corner_radius(egui::CornerRadius::same(4))
         .fill(egui::Color32::from_gray(30))
         .show(ui, |ui| {
             ui.set_min_width(ui.available_width());

@@ -254,7 +254,7 @@ impl WindowManagerApp {
         status: Arc<parking_lot::Mutex<String>>,
     ) {
         use windows::Win32::UI::WindowsAndMessaging::IsWindow;
-        if unsafe { !IsWindow(hwnd).as_bool() } {
+        if unsafe { !IsWindow(Some(hwnd)).as_bool() } {
             *status.lock() = "❌ Window no longer exists (it may have been closed).".into();
             return;
         }

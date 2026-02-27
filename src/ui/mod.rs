@@ -23,7 +23,7 @@ impl eframe::App for WindowManagerApp {
             egui::Area::new(egui::Id::new("close_dialog_overlay"))
                 .fixed_pos(egui::pos2(0.0, 0.0))
                 .show(ctx, |ui| {
-                    let screen = ctx.screen_rect();
+                    let screen = ctx.content_rect();
                     let (rect, _) = ui.allocate_exact_size(screen.size(), egui::Sense::click());
                     ui.painter()
                         .rect_filled(rect, 0.0, egui::Color32::from_black_alpha(120));
@@ -71,10 +71,10 @@ impl eframe::App for WindowManagerApp {
         style.spacing.item_spacing = egui::vec2(8.0, 6.0);
         style.spacing.button_padding = egui::vec2(10.0, 5.0);
         style.spacing.combo_height = 300.0;
-        style.visuals.widgets.noninteractive.rounding = egui::Rounding::same(6.0);
-        style.visuals.widgets.inactive.rounding = egui::Rounding::same(6.0);
-        style.visuals.widgets.hovered.rounding = egui::Rounding::same(6.0);
-        style.visuals.widgets.active.rounding = egui::Rounding::same(6.0);
+        style.visuals.widgets.noninteractive.corner_radius = egui::CornerRadius::same(6);
+        style.visuals.widgets.inactive.corner_radius = egui::CornerRadius::same(6);
+        style.visuals.widgets.hovered.corner_radius = egui::CornerRadius::same(6);
+        style.visuals.widgets.active.corner_radius = egui::CornerRadius::same(6);
 
         style.visuals.window_fill = egui::Color32::from_rgb(14, 14, 14);
         style.visuals.panel_fill = egui::Color32::from_rgb(14, 14, 14);
@@ -132,8 +132,8 @@ impl eframe::App for WindowManagerApp {
                 cols[0].vertical(|ui| {
                     // Outer frame for New Profiles
                     egui::Frame::group(ui.style())
-                        .inner_margin(egui::Margin::same(12.0))
-                        .rounding(egui::Rounding::same(8.0))
+                        .inner_margin(egui::Margin::same(12))
+                        .corner_radius(egui::CornerRadius::same(8))
                         .fill(egui::Color32::from_rgb(25, 25, 25))
                         .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
                         .show(ui, |ui| {
@@ -154,8 +154,8 @@ impl eframe::App for WindowManagerApp {
 
                     // Outer frame for Move Live Window
                     egui::Frame::group(ui.style())
-                        .inner_margin(egui::Margin::same(12.0))
-                        .rounding(egui::Rounding::same(8.0))
+                        .inner_margin(egui::Margin::same(12))
+                        .corner_radius(egui::CornerRadius::same(8))
                         .fill(egui::Color32::from_rgb(25, 25, 25))
                         .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
                         .show(ui, |ui| {
@@ -166,8 +166,8 @@ impl eframe::App for WindowManagerApp {
 
                 cols[1].vertical(|ui| {
                     egui::Frame::group(ui.style())
-                        .inner_margin(egui::Margin::same(12.0))
-                        .rounding(egui::Rounding::same(8.0))
+                        .inner_margin(egui::Margin::same(12))
+                        .corner_radius(egui::CornerRadius::same(8))
                         .fill(egui::Color32::from_rgb(25, 25, 25))
                         .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
                         .show(ui, |ui| {
@@ -200,8 +200,8 @@ impl eframe::App for WindowManagerApp {
 
 fn draw_monitor_preview(app: &mut WindowManagerApp, ui: &mut egui::Ui, selected_idx: usize) {
     egui::Frame::group(ui.style())
-        .inner_margin(egui::Margin::same(12.0))
-        .rounding(egui::Rounding::same(8.0))
+        .inner_margin(egui::Margin::same(12))
+        .corner_radius(egui::CornerRadius::same(8))
         .fill(egui::Color32::from_rgb(25, 25, 25))
         .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
         .show(ui, |ui| {
@@ -262,15 +262,16 @@ fn draw_monitor_preview(app: &mut WindowManagerApp, ui: &mut egui::Ui, selected_
                     painter.rect_filled(m_rect, 4.0, fill);
                     painter.rect_stroke(
                         m_rect,
-                        4.0,
+                        egui::CornerRadius::same(4),
                         egui::Stroke::new(
                             if is_selected { 2.5 } else { 1.5 },
                             if is_selected {
-                                egui::Color32::from_rgb(34, 197, 94) // Brighter green for selected stroke
+                                egui::Color32::from_rgb(34, 197, 94)
                             } else {
                                 egui::Color32::from_white_alpha(40)
                             },
                         ),
+                        egui::StrokeKind::Outside,
                     );
 
                     let w = m.rect.right - m.rect.left;

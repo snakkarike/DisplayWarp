@@ -1,10 +1,11 @@
 use std::ptr;
-use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT, TRUE};
+use windows::Win32::Foundation::{LPARAM, RECT};
 use windows::Win32::Graphics::Gdi::{
     CDS_GLOBAL, CDS_NORESET, CDS_SET_PRIMARY, CDS_TYPE, CDS_UPDATEREGISTRY,
     ChangeDisplaySettingsExW, DEVMODEW, DM_POSITION, ENUM_CURRENT_SETTINGS, EnumDisplayMonitors,
     EnumDisplaySettingsW, GetMonitorInfoW, HDC, HMONITOR, MONITORINFOEXW,
 };
+use windows::core::BOOL;
 use windows::core::PCWSTR;
 
 use crate::models::{MonitorInfo, SavedMonitorPos};
@@ -14,7 +15,7 @@ pub fn get_all_monitors() -> Vec<MonitorInfo> {
     let mut monitors = Vec::new();
     unsafe {
         let _ = EnumDisplayMonitors(
-            HDC(ptr::null_mut()),
+            Some(HDC(ptr::null_mut())),
             None,
             Some(enum_monitor_callback),
             LPARAM(&mut monitors as *mut _ as isize),
@@ -42,7 +43,7 @@ unsafe extern "system" fn enum_monitor_callback(
                 device_name,
             });
         }
-        TRUE
+        BOOL(1)
     }
 }
 
@@ -85,19 +86,13 @@ pub fn switch_primary_to(target_device_name: &str, monitors: &[MonitorInfo]) -> 
             ChangeDisplaySettingsExW(
                 PCWSTR(name_u16.as_ptr()),
                 Some(&dev_mode),
-                HWND(ptr::null_mut()),
+                None,
                 flags,
                 None,
             );
         }
         // Flush all changes at once
-        let _ = ChangeDisplaySettingsExW(
-            PCWSTR(ptr::null()),
-            None,
-            HWND(ptr::null_mut()),
-            CDS_TYPE(0),
-            None,
-        );
+        let _ = ChangeDisplaySettingsExW(PCWSTR(ptr::null()), None, None, CDS_TYPE(0), None);
     }
     true
 }
@@ -130,17 +125,11 @@ pub fn restore_monitor_layout(snapshot: &[SavedMonitorPos]) {
             ChangeDisplaySettingsExW(
                 PCWSTR(name_u16.as_ptr()),
                 Some(&dev_mode),
-                HWND(ptr::null_mut()),
+                None,
                 flags,
                 None,
             );
         }
-        let _ = ChangeDisplaySettingsExW(
-            PCWSTR(ptr::null()),
-            None,
-            HWND(ptr::null_mut()),
-            CDS_TYPE(0),
-            None,
-        );
+        let _ = ChangeDisplaySettingsExW(PCWSTR(ptr::null()), None, None, CDS_TYPE(0), None);
     }
 }

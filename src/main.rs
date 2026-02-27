@@ -37,7 +37,8 @@ fn main() -> eframe::Result {
             // Geist Sans as primary proportional font.
             fonts.font_data.insert(
                 "geist".into(),
-                egui::FontData::from_static(include_bytes!("../assets/fonts/Geist-Regular.ttf")),
+                egui::FontData::from_static(include_bytes!("../assets/fonts/Geist-Regular.ttf"))
+                    .into(),
             );
             fonts
                 .families

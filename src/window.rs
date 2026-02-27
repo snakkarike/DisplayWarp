@@ -1,5 +1,5 @@
 use std::ptr;
-use windows::Win32::Foundation::{BOOL, FALSE, HWND, LPARAM, POINT, RECT, TRUE};
+use windows::Win32::Foundation::{HWND, LPARAM, POINT, RECT};
 use windows::Win32::Graphics::Gdi::{
     HMONITOR, MONITOR_DEFAULTTONEAREST, MonitorFromPoint, MonitorFromWindow,
 };
@@ -14,6 +14,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SetForegroundWindow, SetWindowPlacement, SetWindowPos, ShowWindow, WINDOWPLACEMENT,
     WS_EX_TOOLWINDOW,
 };
+use windows::core::BOOL;
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -102,13 +103,13 @@ pub fn find_window_by_process_name(target_lowercase: &str) -> Option<HWND> {
 unsafe extern "system" fn enum_window_by_name_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
     unsafe {
         if !IsWindowVisible(hwnd).as_bool() {
-            return TRUE;
+            return BOOL(1);
         }
         let data = &mut *(lparam.0 as *mut FindWindowByNameData);
         let mut pid: u32 = 0;
         GetWindowThreadProcessId(hwnd, Some(&mut pid));
         if pid == 0 {
-            return TRUE;
+            return BOOL(1);
         }
         if let Ok(hproc) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
             let mut buf = [0u16; 512];
@@ -147,7 +148,7 @@ unsafe extern "system" fn enum_window_by_name_callback(hwnd: HWND, lparam: LPARA
             }
             let _ = windows::Win32::Foundation::CloseHandle(hproc);
         }
-        TRUE // always keep enumerating to collect all candidates
+        BOOL(1) // always keep enumerating to collect all candidates
     }
 }
 
@@ -176,9 +177,9 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
         GetWindowThreadProcessId(hwnd, Some(&mut window_pid));
         if window_pid == data.pid && IsWindowVisible(hwnd).as_bool() {
             data.hwnd = hwnd;
-            FALSE // Stop enumeration — we have our window
+            BOOL(0) // Stop enumeration — we have our window
         } else {
-            TRUE
+            BOOL(1)
         }
     }
 }
@@ -208,7 +209,7 @@ pub fn move_window_once(hwnd: HWND, target_rect: RECT) {
     unsafe {
         // Bail if the window handle is no longer valid (e.g. app closed,
         // or display layout change destroyed and recreated windows).
-        if !IsWindow(hwnd).as_bool() {
+        if !IsWindow(Some(hwnd)).as_bool() {
             return;
         }
 
@@ -239,7 +240,7 @@ pub fn move_window_once(hwnd: HWND, target_rect: RECT) {
         // 3. Visually move the window with SetWindowPos.
         let _ = SetWindowPos(
             hwnd,
-            HWND_TOP,
+            Some(HWND_TOP),
             target_rect.left,
             target_rect.top,
             w,
@@ -268,7 +269,7 @@ pub fn move_to_monitor(hwnd: HWND, target_rect: RECT) {
     for attempt in 0..12u32 {
         unsafe {
             // Bail if window was destroyed (display change, app closed, etc.)
-            if !IsWindow(hwnd).as_bool() {
+            if !IsWindow(Some(hwnd)).as_bool() {
                 return;
             }
             if attempt > 0 {
@@ -280,7 +281,7 @@ pub fn move_to_monitor(hwnd: HWND, target_rect: RECT) {
             std::thread::sleep(std::time::Duration::from_millis(60));
             let _ = SetWindowPos(
                 hwnd,
-                HWND_TOP,
+                Some(HWND_TOP),
                 target_rect.left,
                 target_rect.top,
                 w,
@@ -303,7 +304,7 @@ pub fn move_to_monitor(hwnd: HWND, target_rect: RECT) {
         std::thread::sleep(std::time::Duration::from_millis(1000));
         unsafe {
             // Stop watching if window was destroyed.
-            if !IsWindow(hwnd).as_bool() {
+            if !IsWindow(Some(hwnd)).as_bool() {
                 return;
             }
             if MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) != target_mon {
@@ -313,7 +314,7 @@ pub fn move_to_monitor(hwnd: HWND, target_rect: RECT) {
                 std::thread::sleep(std::time::Duration::from_millis(60));
                 let _ = SetWindowPos(
                     hwnd,
-                    HWND_TOP,
+                    Some(HWND_TOP),
                     target_rect.left,
                     target_rect.top,
                     w,
@@ -357,17 +358,17 @@ pub fn list_visible_windows() -> Vec<ProcessEntry> {
 unsafe extern "system" fn enum_visible_windows_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
     unsafe {
         if !IsWindowVisible(hwnd).as_bool() {
-            return TRUE;
+            return BOOL(1);
         }
         // Skip tool windows
         let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
         if ex_style & WS_EX_TOOLWINDOW.0 != 0 {
-            return TRUE;
+            return BOOL(1);
         }
         // Must have a title
         let title_len = GetWindowTextLengthW(hwnd);
         if title_len <= 0 {
-            return TRUE;
+            return BOOL(1);
         }
         let mut title_buf = vec![0u16; (title_len + 1) as usize];
         GetWindowTextW(hwnd, &mut title_buf);
@@ -415,6 +416,6 @@ unsafe extern "system" fn enum_visible_windows_callback(hwnd: HWND, lparam: LPAR
             label: format!("{exe_name} — {title}"),
         });
 
-        TRUE
+        BOOL(1)
     }
 }
