@@ -86,9 +86,11 @@ You can edit this file by hand — changes take effect on next launch.
 |               |                                                                                                           |
 | ------------- | --------------------------------------------------------------------------------------------------------- |
 | UI            | [egui](https://github.com/emilk/egui) / [eframe](https://github.com/emilk/egui/tree/master/crates/eframe) |
+| System Tray   | [tray-icon](https://github.com/tauri-apps/tray-icon)                                                      |
 | Win32         | [windows-rs](https://github.com/microsoft/windows-rs)                                                     |
 | Serialization | [serde](https://serde.rs) + serde_json                                                                    |
 | File dialogs  | [rfd](https://github.com/PolyMeilex/rfd)                                                                  |
+| Icons         | [egui-phosphor](https://github.com/lucasmerlin/egui-phosphor)                                             |
 
 ---
 
