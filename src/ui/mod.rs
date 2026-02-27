@@ -57,7 +57,6 @@ impl eframe::App for WindowManagerApp {
                             )
                             .clicked()
                         {
-                            self.show_close_dialog = false;
                             self.watcher_running
                                 .store(false, std::sync::atomic::Ordering::Relaxed);
                             std::process::exit(0);
