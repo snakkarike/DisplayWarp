@@ -16,7 +16,11 @@ pub fn draw_profiles_list(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
         ui.label(
             egui::RichText::new("No profiles yet — create one on the left.")
                 .small()
-                .color(egui::Color32::GRAY),
+                .color(if app.dark_mode {
+                    egui::Color32::GRAY
+                } else {
+                    egui::Color32::from_gray(100)
+                }),
         );
     }
 
@@ -46,33 +50,50 @@ fn draw_profile_card(
     egui::Frame::group(ui.style())
         .inner_margin(egui::Margin::same(12))
         .corner_radius(egui::CornerRadius::same(8))
-        .fill(egui::Color32::from_rgb(34, 34, 34))
-        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+        .fill(if app.dark_mode {
+            egui::Color32::from_rgb(34, 34, 34)
+        } else {
+            egui::Color32::from_rgb(241, 245, 249)
+        })
+        .stroke(egui::Stroke::new(
+            1.0,
+            if app.dark_mode {
+                egui::Color32::from_rgb(44, 44, 44)
+            } else {
+                egui::Color32::from_rgb(226, 232, 240)
+            },
+        ))
         .show(ui, |ui| {
-            // ── Header: name + display badge ──
-            ui.horizontal(|ui| {
+            // ── Header: name + display badge (Vertical layout for narrow columns) ──
+            ui.vertical(|ui| {
                 ui.label(egui::RichText::new(&p.name).strong().size(13.0));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let badge_text = format!(
-                        "{} {}",
-                        regular::MONITOR,
-                        p.target_monitor_name
-                            .replace("\\\\.\\", "")
-                            .replace("DISPLAY", "Display "),
-                    );
-                    ui.label(
-                        egui::RichText::new(badge_text)
-                            .small()
-                            .color(egui::Color32::from_rgb(150, 200, 255)),
-                    );
-                });
+                let badge_text = format!(
+                    "{} {}",
+                    regular::MONITOR,
+                    p.target_monitor_name
+                        .replace("\\\\.\\", "")
+                        .replace("DISPLAY", "Display "),
+                );
+                ui.label(
+                    egui::RichText::new(badge_text)
+                        .small()
+                        .color(if app.dark_mode {
+                            egui::Color32::from_rgb(150, 200, 255)
+                        } else {
+                            egui::Color32::from_rgb(37, 99, 235)
+                        }),
+                );
             });
 
             // ── Exe path ──
             ui.label(
                 egui::RichText::new(format!("{} {}", regular::FOLDER_OPEN, p.exe_path.display()))
                     .small()
-                    .color(egui::Color32::GRAY),
+                    .color(if app.dark_mode {
+                        egui::Color32::GRAY
+                    } else {
+                        egui::Color32::from_gray(80)
+                    }),
             );
 
             // ── Window process name (if any) ──
@@ -80,7 +101,11 @@ fn draw_profile_card(
                 ui.label(
                     egui::RichText::new(format!("{} {}", regular::FILE, proc))
                         .small()
-                        .color(egui::Color32::GRAY),
+                        .color(if app.dark_mode {
+                            egui::Color32::GRAY
+                        } else {
+                            egui::Color32::from_gray(80)
+                        }),
                 );
             }
 
@@ -102,8 +127,7 @@ fn draw_profile_card(
                 if ui
                     .add_sized(
                         [btn_width, 24.0],
-                        egui::Button::new(format!("{} Launch", regular::PLAY))
-                            .fill(egui::Color32::from_rgb(7, 7, 7)),
+                        egui::Button::new(format!("{} Launch", regular::PLAY)),
                     )
                     .clicked()
                 {
@@ -112,8 +136,7 @@ fn draw_profile_card(
                 if ui
                     .add_sized(
                         [btn_width, 24.0],
-                        egui::Button::new(format!("{} Edit", regular::PENCIL_SIMPLE))
-                            .fill(egui::Color32::from_rgb(7, 7, 7)),
+                        egui::Button::new(format!("{} Edit", regular::PENCIL_SIMPLE)),
                     )
                     .clicked()
                 {
@@ -131,8 +154,7 @@ fn draw_profile_card(
                 if ui
                     .add_sized(
                         [btn_width, 24.0],
-                        egui::Button::new(format!("{} Delete", regular::TRASH))
-                            .fill(egui::Color32::from_rgb(7, 7, 7)),
+                        egui::Button::new(format!("{} Delete", regular::TRASH)),
                     )
                     .clicked()
                 {
@@ -156,23 +178,46 @@ fn draw_edit_profile_form(
     egui::Frame::group(ui.style())
         .inner_margin(egui::Margin::same(12))
         .corner_radius(egui::CornerRadius::same(8))
-        .fill(egui::Color32::from_rgb(45, 45, 35)) // Slight tint for editing
+        .fill(if app.dark_mode {
+            egui::Color32::from_rgb(45, 25, 25)
+        } else {
+            egui::Color32::from_rgb(254, 242, 242)
+        })
         .stroke(egui::Stroke::new(
             1.5,
-            egui::Color32::from_rgb(200, 180, 50),
+            if app.dark_mode {
+                egui::Color32::from_rgb(239, 68, 68)
+            } else {
+                egui::Color32::from_rgb(220, 38, 38)
+            },
         ))
         .show(ui, |ui| {
             ui.label(
                 egui::RichText::new(format!("{} Editing Profile", regular::PENCIL_SIMPLE))
-                    .color(egui::Color32::YELLOW)
+                    .color(if app.dark_mode {
+                        egui::Color32::from_rgb(254, 202, 202)
+                    } else {
+                        egui::Color32::from_rgb(153, 27, 27)
+                    })
                     .strong(),
             );
 
             egui::Frame::NONE
                 .inner_margin(egui::Margin::same(8))
                 .corner_radius(egui::CornerRadius::same(6))
-                .fill(egui::Color32::from_rgb(34, 34, 34))
-                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+                .fill(if app.dark_mode {
+                    egui::Color32::from_rgb(34, 34, 34)
+                } else {
+                    egui::Color32::from_rgb(241, 245, 249)
+                })
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    if app.dark_mode {
+                        egui::Color32::from_rgb(44, 44, 44)
+                    } else {
+                        egui::Color32::from_rgb(226, 232, 240)
+                    },
+                ))
                 .show(ui, |ui| {
                     ui.label(
                         egui::RichText::new(format!("{} Profile Name", regular::PENCIL_SIMPLE))
@@ -190,8 +235,19 @@ fn draw_edit_profile_form(
             egui::Frame::NONE
                 .inner_margin(egui::Margin::same(8))
                 .corner_radius(egui::CornerRadius::same(6))
-                .fill(egui::Color32::from_rgb(34, 34, 34))
-                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+                .fill(if app.dark_mode {
+                    egui::Color32::from_rgb(34, 34, 34)
+                } else {
+                    egui::Color32::from_rgb(241, 245, 249)
+                })
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    if app.dark_mode {
+                        egui::Color32::from_rgb(44, 44, 44)
+                    } else {
+                        egui::Color32::from_rgb(226, 232, 240)
+                    },
+                ))
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
                         ui.label(regular::FOLDER_OPEN);
@@ -210,14 +266,9 @@ fn draw_edit_profile_form(
 
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui
-                                .add(
-                                    egui::Button::new(
-                                        egui::RichText::new("Change EXE")
-                                            .strong()
-                                            .color(egui::Color32::WHITE),
-                                    )
-                                    .fill(egui::Color32::from_rgb(7, 7, 7)),
-                                )
+                                .add(egui::Button::new(
+                                    egui::RichText::new("Change EXE").strong(),
+                                ))
                                 .clicked()
                             {
                                 app.edit_profile_exe = rfd::FileDialog::new()
@@ -233,8 +284,19 @@ fn draw_edit_profile_form(
             egui::Frame::NONE
                 .inner_margin(egui::Margin::same(8))
                 .corner_radius(egui::CornerRadius::same(6))
-                .fill(egui::Color32::from_rgb(34, 34, 34))
-                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+                .fill(if app.dark_mode {
+                    egui::Color32::from_rgb(34, 34, 34)
+                } else {
+                    egui::Color32::from_rgb(241, 245, 249)
+                })
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    if app.dark_mode {
+                        egui::Color32::from_rgb(44, 44, 44)
+                    } else {
+                        egui::Color32::from_rgb(226, 232, 240)
+                    },
+                ))
                 .show(ui, |ui| {
                     ui.label(
                         egui::RichText::new(format!("{} Target monitor", regular::MONITOR))
@@ -266,8 +328,19 @@ fn draw_edit_profile_form(
             egui::Frame::NONE
                 .inner_margin(egui::Margin::same(8))
                 .corner_radius(egui::CornerRadius::same(6))
-                .fill(egui::Color32::from_rgb(34, 34, 34))
-                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+                .fill(if app.dark_mode {
+                    egui::Color32::from_rgb(34, 34, 34)
+                } else {
+                    egui::Color32::from_rgb(241, 245, 249)
+                })
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    if app.dark_mode {
+                        egui::Color32::from_rgb(44, 44, 44)
+                    } else {
+                        egui::Color32::from_rgb(226, 232, 240)
+                    },
+                ))
                 .show(ui, |ui| {
                     ui.label(
                         egui::RichText::new(format!("{} Window process", regular::FILE)).strong(),
@@ -284,10 +357,7 @@ fn draw_edit_profile_form(
 
             ui.horizontal(|ui| {
                 if ui
-                    .add(
-                        egui::Button::new(format!("{} Save", regular::CHECK))
-                            .fill(egui::Color32::from_rgb(7, 7, 7)),
-                    )
+                    .add(egui::Button::new(format!("{} Save", regular::CHECK)))
                     .clicked()
                 {
                     if let Some(idx) = app.editing_profile_idx {
@@ -324,10 +394,7 @@ fn draw_edit_profile_form(
                     app.edit_profile_window_process.clear();
                 }
                 if ui
-                    .add(
-                        egui::Button::new(format!("{} Cancel", regular::X))
-                            .fill(egui::Color32::from_rgb(7, 7, 7)),
-                    )
+                    .add(egui::Button::new(format!("{} Cancel", regular::X)))
                     .clicked()
                 {
                     app.editing_profile_idx = None;
@@ -336,10 +403,7 @@ fn draw_edit_profile_form(
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
-                        .add(
-                            egui::Button::new(format!("{} Delete", regular::TRASH))
-                                .fill(egui::Color32::from_rgb(7, 7, 7)),
-                        )
+                        .add(egui::Button::new(format!("{} Delete", regular::TRASH)))
                         .clicked()
                     {
                         *to_remove = Some(i);
@@ -359,8 +423,19 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     egui::Frame::NONE
         .inner_margin(egui::Margin::same(8))
         .corner_radius(egui::CornerRadius::same(6))
-        .fill(egui::Color32::from_rgb(34, 34, 34))
-        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+        .fill(if app.dark_mode {
+            egui::Color32::from_rgb(34, 34, 34)
+        } else {
+            egui::Color32::from_rgb(241, 245, 249)
+        })
+        .stroke(egui::Stroke::new(
+            1.0,
+            if app.dark_mode {
+                egui::Color32::from_rgb(44, 44, 44)
+            } else {
+                egui::Color32::from_rgb(226, 232, 240)
+            },
+        ))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(regular::FOLDER_OPEN);
@@ -378,11 +453,7 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
-                        .button(
-                            egui::RichText::new("Select EXE")
-                                .strong()
-                                .color(egui::Color32::WHITE),
-                        )
+                        .button(egui::RichText::new("Select EXE").strong())
                         .clicked()
                     {
                         if let Some(path) = rfd::FileDialog::new()
@@ -406,8 +477,19 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     egui::Frame::NONE
         .inner_margin(egui::Margin::same(8))
         .corner_radius(egui::CornerRadius::same(6))
-        .fill(egui::Color32::from_rgb(34, 34, 34))
-        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+        .fill(if app.dark_mode {
+            egui::Color32::from_rgb(34, 34, 34)
+        } else {
+            egui::Color32::from_rgb(241, 245, 249)
+        })
+        .stroke(egui::Stroke::new(
+            1.0,
+            if app.dark_mode {
+                egui::Color32::from_rgb(44, 44, 44)
+            } else {
+                egui::Color32::from_rgb(226, 232, 240)
+            },
+        ))
         .show(ui, |ui| {
             ui.label(
                 egui::RichText::new(format!("{} Profile Name", regular::PENCIL_SIMPLE)).strong(),
@@ -426,8 +508,19 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     egui::Frame::NONE
         .inner_margin(egui::Margin::same(8))
         .corner_radius(egui::CornerRadius::same(6))
-        .fill(egui::Color32::from_rgb(34, 34, 34))
-        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+        .fill(if app.dark_mode {
+            egui::Color32::from_rgb(34, 34, 34)
+        } else {
+            egui::Color32::from_rgb(241, 245, 249)
+        })
+        .stroke(egui::Stroke::new(
+            1.0,
+            if app.dark_mode {
+                egui::Color32::from_rgb(44, 44, 44)
+            } else {
+                egui::Color32::from_rgb(226, 232, 240)
+            },
+        ))
         .show(ui, |ui| {
             ui.label(
                 egui::RichText::new(format!("{} Select Preferred Monitor", regular::MONITOR))
@@ -460,8 +553,19 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     egui::Frame::NONE
         .inner_margin(egui::Margin::same(8))
         .corner_radius(egui::CornerRadius::same(6))
-        .fill(egui::Color32::from_rgb(34, 34, 34))
-        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+        .fill(if app.dark_mode {
+            egui::Color32::from_rgb(34, 34, 34)
+        } else {
+            egui::Color32::from_rgb(241, 245, 249)
+        })
+        .stroke(egui::Stroke::new(
+            1.0,
+            if app.dark_mode {
+                egui::Color32::from_rgb(44, 44, 44)
+            } else {
+                egui::Color32::from_rgb(226, 232, 240)
+            },
+        ))
         .show(ui, |ui| {
             ui.label(egui::RichText::new(format!("{} Window Process", regular::FILE)).strong());
             ui.add_space(4.0);
@@ -482,8 +586,7 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     if ui
         .add_sized(
             [ui.available_width(), 28.0],
-            egui::Button::new(format!("{} Save Profile", regular::FLOPPY_DISK))
-                .fill(egui::Color32::from_rgb(7, 7, 7)),
+            egui::Button::new(format!("{} Save Profile", regular::FLOPPY_DISK)),
         )
         .clicked()
         && can_save
@@ -527,10 +630,10 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui
-                .add(
-                    egui::Button::new(format!("{} Refresh Process List", regular::ARROW_CLOCKWISE))
-                        .fill(egui::Color32::from_rgb(7, 7, 7)),
-                )
+                .add(egui::Button::new(format!(
+                    "{} Refresh",
+                    regular::ARROW_CLOCKWISE
+                )))
                 .clicked()
             {
                 app.refresh_live_processes();
@@ -544,8 +647,19 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     egui::Frame::NONE
         .inner_margin(egui::Margin::same(8))
         .corner_radius(egui::CornerRadius::same(6))
-        .fill(egui::Color32::from_rgb(34, 34, 34))
-        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+        .fill(if app.dark_mode {
+            egui::Color32::from_rgb(34, 34, 34)
+        } else {
+            egui::Color32::from_rgb(241, 245, 249)
+        })
+        .stroke(egui::Stroke::new(
+            1.0,
+            if app.dark_mode {
+                egui::Color32::from_rgb(44, 44, 44)
+            } else {
+                egui::Color32::from_rgb(226, 232, 240)
+            },
+        ))
         .show(ui, |ui| {
             ui.label(egui::RichText::new(format!("{} Window Process", regular::FILE)).strong());
             ui.add_space(4.0);
@@ -583,8 +697,19 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     egui::Frame::NONE
         .inner_margin(egui::Margin::same(8))
         .corner_radius(egui::CornerRadius::same(6))
-        .fill(egui::Color32::from_rgb(34, 34, 34))
-        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+        .fill(if app.dark_mode {
+            egui::Color32::from_rgb(34, 34, 34)
+        } else {
+            egui::Color32::from_rgb(241, 245, 249)
+        })
+        .stroke(egui::Stroke::new(
+            1.0,
+            if app.dark_mode {
+                egui::Color32::from_rgb(44, 44, 44)
+            } else {
+                egui::Color32::from_rgb(226, 232, 240)
+            },
+        ))
         .show(ui, |ui| {
             ui.label(
                 egui::RichText::new(format!("{} Select Target Monitor", regular::MONITOR)).strong(),
@@ -623,8 +748,7 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                 egui::Button::new(
                     egui::RichText::new(format!("{} Move Process", regular::ARROWS_OUT_SIMPLE))
                         .strong(),
-                )
-                .fill(egui::Color32::from_rgb(7, 7, 7)), // overriding previous explicit fill
+                ),
             )
             .clicked()
             && can_move
@@ -641,8 +765,7 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                 [btn_width, 30.0],
                 egui::Button::new(
                     egui::RichText::new(format!("{} Create Profile", regular::PLUS)).strong(),
-                )
-                .fill(egui::Color32::from_rgb(7, 7, 7)), // overriding previous explicit fill
+                ),
             )
             .clicked()
             && can_move
@@ -687,12 +810,28 @@ pub fn draw_status_bar(app: &WindowManagerApp, ui: &mut egui::Ui) {
     } else if status.starts_with('⚠') {
         egui::Color32::YELLOW
     } else {
-        egui::Color32::GRAY
+        if app.dark_mode {
+            egui::Color32::GRAY
+        } else {
+            egui::Color32::from_gray(100)
+        }
     };
     egui::Frame::NONE
         .inner_margin(egui::Margin::same(6))
         .corner_radius(egui::CornerRadius::same(4))
-        .fill(egui::Color32::from_gray(30))
+        .fill(if app.dark_mode {
+            egui::Color32::from_gray(30)
+        } else {
+            egui::Color32::from_rgb(241, 245, 249)
+        })
+        .stroke(egui::Stroke::new(
+            1.0,
+            if app.dark_mode {
+                egui::Color32::TRANSPARENT
+            } else {
+                egui::Color32::from_rgb(226, 232, 240)
+            },
+        ))
         .show(ui, |ui| {
             ui.set_min_width(ui.available_width());
             ui.label(egui::RichText::new(&status).small().color(color));

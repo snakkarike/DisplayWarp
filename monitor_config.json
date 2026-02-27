@@ -1,34 +1,6 @@
 {
   "profiles": [
     {
-      "name": "Unravel Two",
-      "exe_path": "G:\\Games\\Unravel Two\\Start English.exe",
-      "target_monitor_name": "\\\\.\\DISPLAY2",
-      "target_monitor_rect": {
-        "left": 2560,
-        "top": 0,
-        "right": 4480,
-        "bottom": 1080
-      },
-      "window_process_name": "UnravelTwo.exe",
-      "force_primary": true,
-      "persistent_monitor": false
-    },
-    {
-      "name": "DaveTheDiver.exe",
-      "exe_path": "G:\\Games\\Dave the Diver\\DaveTheDiver.exe",
-      "target_monitor_name": "\\\\.\\DISPLAY1",
-      "target_monitor_rect": {
-        "left": 0,
-        "top": 0,
-        "right": 2560,
-        "bottom": 1440
-      },
-      "window_process_name": null,
-      "force_primary": false,
-      "persistent_monitor": false
-    },
-    {
       "name": "Dispatch.exe",
       "exe_path": "G:\\Games\\Dispatch\\Dispatch.exe",
       "target_monitor_name": "\\\\.\\DISPLAY3",

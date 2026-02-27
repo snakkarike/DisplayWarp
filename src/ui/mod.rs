@@ -66,7 +66,7 @@ impl eframe::App for WindowManagerApp {
                 });
         }
 
-        // ── Apply dark theme styling ─────────────────────────────────────
+        // ── Apply theme styling ─────────────────────────────────────
         let mut style = (*ctx.style()).clone();
         style.spacing.item_spacing = egui::vec2(8.0, 6.0);
         style.spacing.button_padding = egui::vec2(10.0, 5.0);
@@ -76,39 +76,63 @@ impl eframe::App for WindowManagerApp {
         style.visuals.widgets.hovered.corner_radius = egui::CornerRadius::same(6);
         style.visuals.widgets.active.corner_radius = egui::CornerRadius::same(6);
 
-        style.visuals.window_fill = egui::Color32::from_rgb(14, 14, 14);
-        style.visuals.panel_fill = egui::Color32::from_rgb(14, 14, 14);
-        style.visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(7, 7, 7);
+        if self.dark_mode {
+            style.visuals = egui::Visuals::dark();
+            style.visuals.window_fill = egui::Color32::from_rgb(14, 14, 14);
+            style.visuals.panel_fill = egui::Color32::from_rgb(14, 14, 14);
+            style.visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(7, 7, 7);
+        } else {
+            style.visuals = egui::Visuals::light();
+            style.visuals.window_fill = egui::Color32::WHITE;
+            style.visuals.panel_fill = egui::Color32::WHITE;
+
+            // Text: Black
+            style.visuals.override_text_color = Some(egui::Color32::BLACK);
+            style.visuals.widgets.noninteractive.fg_stroke.color = egui::Color32::BLACK;
+            style.visuals.widgets.inactive.fg_stroke.color = egui::Color32::BLACK;
+            style.visuals.widgets.hovered.fg_stroke.color = egui::Color32::BLACK;
+            style.visuals.widgets.active.fg_stroke.color = egui::Color32::BLACK;
+
+            // Button bg: CBD5E1
+            let btn_bg = egui::Color32::from_rgb(203, 213, 225);
+            style.visuals.widgets.inactive.bg_fill = btn_bg;
+            style.visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(180, 195, 215); // Slightly darker for hover
+            style.visuals.widgets.active.bg_fill = egui::Color32::from_rgb(160, 175, 195);
+        }
 
         ctx.set_style(style);
 
-        // ── Bottom: Log (pinned to bottom) ─────────────────────────────
-        egui::TopBottomPanel::bottom("log_panel")
-            .min_height(65.0)
+        // ── Bottom Bar: Version + Theme Toggle ─────────────────────────────
+        egui::TopBottomPanel::bottom("bottom_bar")
+            .resizable(false)
             .show(ctx, |ui| {
-                ui.label(
-                    egui::RichText::new(format!("{} Log", regular::NOTE_PENCIL))
-                        .size(14.0)
-                        .strong(),
-                );
-                panels::draw_status_bar(self, ui);
+                ui.horizontal(|ui| {
+                    ui.label(
+                        egui::RichText::new("v1.0.6")
+                            .small()
+                            .color(if self.dark_mode {
+                                egui::Color32::GRAY
+                            } else {
+                                egui::Color32::from_gray(100)
+                            }),
+                    );
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let theme_icon = if self.dark_mode {
+                            regular::SUN
+                        } else {
+                            regular::MOON
+                        };
+                        if ui.button(theme_icon).clicked() {
+                            self.dark_mode = !self.dark_mode;
+                        }
+                    });
+                });
             });
 
-        // ── Central: everything else (flex-fills remaining space) ────────
+        // ── Central: everything else ─────────────────────────────────────
         egui::CentralPanel::default().show(ctx, |ui| {
-            // ui.add_space(4.0);
-
-            // Lazy-load the logo texture on first frame.
-            // if self.logo_texture.is_none() {
-            //     let rgba = crate::svg_render::svg_to_rgba(
-            //         include_bytes!("../../assets/DisplayWarpLogo.svg"),
-            //         195,
-            //         30,
-            //     );
-            //     let image = egui::ColorImage::from_rgba_unmultiplied([195, 30], &rgba);
-            //     self.logo_texture =
-            //         Some(ctx.load_texture("logo", image, egui::TextureOptions::LINEAR));
-            // }
+            // Header: Logo
             if let Some(tex) = &self.logo_texture {
                 ui.image(egui::load::SizedTexture::new(
                     tex.id(),
@@ -123,24 +147,65 @@ impl eframe::App for WindowManagerApp {
             } else {
                 self.selected_mon_idx
             };
-            draw_monitor_preview(self, ui, preview_idx);
+            draw_monitor_preview(self, ui, Some(preview_idx));
 
             ui.add_space(8.0);
 
-            // Two-column: New Profiles + Live Mover | Saved Profiles
-            ui.columns(2, |cols| {
+            // 3-Column Grid: Live Mover | New Profile | Saved Profiles
+            ui.columns(3, |cols| {
+                let col_height = cols[0].available_height();
+
+                // Col 1: Move Live Window
                 cols[0].vertical(|ui| {
-                    // Outer frame for New Profiles
+                    ui.set_min_height(col_height);
                     egui::Frame::group(ui.style())
                         .inner_margin(egui::Margin::same(12))
                         .corner_radius(egui::CornerRadius::same(8))
-                        .fill(egui::Color32::from_rgb(25, 25, 25))
-                        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+                        .fill(if self.dark_mode {
+                            egui::Color32::from_rgb(25, 25, 25)
+                        } else {
+                            egui::Color32::from_rgb(248, 250, 252)
+                        })
+                        .stroke(egui::Stroke::new(
+                            1.0,
+                            if self.dark_mode {
+                                egui::Color32::from_rgb(44, 44, 44)
+                            } else {
+                                egui::Color32::from_rgb(226, 232, 240)
+                            },
+                        ))
                         .show(ui, |ui| {
                             ui.set_width(ui.available_width());
+                            ui.set_min_height(ui.available_height());
+                            panels::draw_live_process_mover(self, ui);
+                        });
+                });
+
+                // Col 2: New Profile
+                cols[1].vertical(|ui| {
+                    ui.set_min_height(col_height);
+                    egui::Frame::group(ui.style())
+                        .inner_margin(egui::Margin::same(12))
+                        .corner_radius(egui::CornerRadius::same(8))
+                        .fill(if self.dark_mode {
+                            egui::Color32::from_rgb(25, 25, 25)
+                        } else {
+                            egui::Color32::from_rgb(248, 250, 252)
+                        })
+                        .stroke(egui::Stroke::new(
+                            1.0,
+                            if self.dark_mode {
+                                egui::Color32::from_rgb(44, 44, 44)
+                            } else {
+                                egui::Color32::from_rgb(226, 232, 240)
+                            },
+                        ))
+                        .show(ui, |ui| {
+                            ui.set_width(ui.available_width());
+                            ui.set_min_height(ui.available_height());
                             ui.label(
                                 egui::RichText::new(format!(
-                                    "{} New Profiles",
+                                    "{} New Profile",
                                     regular::PLUS_CIRCLE
                                 ))
                                 .size(14.0)
@@ -149,29 +214,30 @@ impl eframe::App for WindowManagerApp {
                             ui.add_space(8.0);
                             panels::draw_new_profile_form(self, ui);
                         });
-
-                    ui.add_space(8.0);
-
-                    // Outer frame for Move Live Window
-                    egui::Frame::group(ui.style())
-                        .inner_margin(egui::Margin::same(12))
-                        .corner_radius(egui::CornerRadius::same(8))
-                        .fill(egui::Color32::from_rgb(25, 25, 25))
-                        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
-                        .show(ui, |ui| {
-                            ui.set_width(ui.available_width());
-                            panels::draw_live_process_mover(self, ui);
-                        });
                 });
 
-                cols[1].vertical(|ui| {
+                // Col 3: Saved Profiles
+                cols[2].vertical(|ui| {
+                    ui.set_min_height(col_height);
                     egui::Frame::group(ui.style())
                         .inner_margin(egui::Margin::same(12))
                         .corner_radius(egui::CornerRadius::same(8))
-                        .fill(egui::Color32::from_rgb(25, 25, 25))
-                        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+                        .fill(if self.dark_mode {
+                            egui::Color32::from_rgb(25, 25, 25)
+                        } else {
+                            egui::Color32::from_rgb(248, 250, 252)
+                        })
+                        .stroke(egui::Stroke::new(
+                            1.0,
+                            if self.dark_mode {
+                                egui::Color32::from_rgb(44, 44, 44)
+                            } else {
+                                egui::Color32::from_rgb(226, 232, 240)
+                            },
+                        ))
                         .show(ui, |ui| {
                             ui.set_width(ui.available_width());
+                            ui.set_min_height(ui.available_height());
                             ui.label(
                                 egui::RichText::new(format!(
                                     "{} Saved Profiles",
@@ -181,10 +247,8 @@ impl eframe::App for WindowManagerApp {
                                 .strong(),
                             );
                             ui.add_space(8.0);
-                            // Flex-expand: use all remaining height in this column
-                            let remaining = ui.available_height() - 10.0;
                             egui::ScrollArea::vertical()
-                                .max_height(remaining.max(80.0))
+                                .auto_shrink([false; 2])
                                 .id_salt("saved_profiles_scroll")
                                 .show(ui, |ui| {
                                     panels::draw_profiles_list(self, ui);
@@ -192,18 +256,62 @@ impl eframe::App for WindowManagerApp {
                         });
                 });
             });
+
+            ui.add_space(8.0);
+
+            // Log Block (Below the 3 columns)
+            egui::Frame::group(ui.style())
+                .inner_margin(egui::Margin::same(12))
+                .corner_radius(egui::CornerRadius::same(8))
+                .fill(if self.dark_mode {
+                    egui::Color32::from_rgb(25, 25, 25)
+                } else {
+                    egui::Color32::from_rgb(248, 250, 252)
+                })
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    if self.dark_mode {
+                        egui::Color32::from_rgb(44, 44, 44)
+                    } else {
+                        egui::Color32::from_rgb(226, 232, 240)
+                    },
+                ))
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.label(
+                        egui::RichText::new(format!("{} Log", regular::NOTE_PENCIL))
+                            .size(14.0)
+                            .strong(),
+                    );
+                    panels::draw_status_bar(self, ui);
+                });
         });
     }
 }
 
 // ─── Monitor Preview ─────────────────────────────────────────────────────────
 
-fn draw_monitor_preview(app: &mut WindowManagerApp, ui: &mut egui::Ui, selected_idx: usize) {
+pub fn draw_monitor_preview(
+    app: &mut WindowManagerApp,
+    ui: &mut egui::Ui,
+    highlight_idx: Option<usize>,
+) {
     egui::Frame::group(ui.style())
         .inner_margin(egui::Margin::same(12))
         .corner_radius(egui::CornerRadius::same(8))
-        .fill(egui::Color32::from_rgb(25, 25, 25))
-        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 44, 44)))
+        .fill(if app.dark_mode {
+            egui::Color32::from_rgb(25, 25, 25)
+        } else {
+            egui::Color32::from_rgb(248, 250, 252)
+        })
+        .stroke(egui::Stroke::new(
+            1.0,
+            if app.dark_mode {
+                egui::Color32::from_rgb(44, 44, 44)
+            } else {
+                egui::Color32::from_rgb(226, 232, 240)
+            },
+        ))
         .show(ui, |ui| {
             let (rect, _) = ui.allocate_at_least(
                 egui::vec2(ui.available_width(), 160.0),
@@ -236,7 +344,7 @@ fn draw_monitor_preview(app: &mut WindowManagerApp, ui: &mut egui::Ui, selected_
                 let center = rect.center();
 
                 for (i, m) in app.monitors.iter().enumerate() {
-                    let is_selected = i == selected_idx;
+                    let is_selected = highlight_idx == Some(i);
                     let is_primary = m.rect.left == 0 && m.rect.top == 0;
                     let m_rect = egui::Rect::from_min_max(
                         center
@@ -252,11 +360,23 @@ fn draw_monitor_preview(app: &mut WindowManagerApp, ui: &mut egui::Ui, selected_
                     );
 
                     let fill = if is_selected {
-                        egui::Color32::from_rgb(20, 83, 45) // #14532D
+                        if app.dark_mode {
+                            egui::Color32::from_rgb(20, 83, 45) // Dark Green
+                        } else {
+                            egui::Color32::from_rgb(34, 197, 94) // #22C55E
+                        }
                     } else if is_primary {
-                        egui::Color32::from_rgb(76, 29, 149) // #4C1D95
+                        if app.dark_mode {
+                            egui::Color32::from_rgb(76, 29, 149) // Dark Purple
+                        } else {
+                            egui::Color32::from_rgb(139, 92, 246) // #8B5CF6
+                        }
                     } else {
-                        egui::Color32::from_rgb(30, 41, 59) // #1E293B
+                        if app.dark_mode {
+                            egui::Color32::from_rgb(30, 41, 59) // Dark Slate
+                        } else {
+                            egui::Color32::from_rgb(148, 163, 184) // #94A3B8
+                        }
                     };
 
                     painter.rect_filled(m_rect, 4.0, fill);
@@ -276,26 +396,44 @@ fn draw_monitor_preview(app: &mut WindowManagerApp, ui: &mut egui::Ui, selected_
 
                     let w = m.rect.right - m.rect.left;
                     let h = m.rect.bottom - m.rect.top;
+
+                    // Center: "Resolution" label
                     painter.text(
                         m_rect.center() + egui::vec2(0.0, -8.0),
                         egui::Align2::CENTER_CENTER,
                         "Resolution",
                         egui::FontId::proportional(10.0),
-                        egui::Color32::from_white_alpha(180),
+                        if app.dark_mode {
+                            egui::Color32::from_white_alpha(180)
+                        } else {
+                            egui::Color32::from_black_alpha(180)
+                        },
                     );
+
+                    // Below Center: "Width x Height"
                     painter.text(
                         m_rect.center() + egui::vec2(0.0, 6.0),
                         egui::Align2::CENTER_CENTER,
                         format!("{}×{}", w, h),
                         egui::FontId::proportional(11.0),
-                        egui::Color32::WHITE,
+                        if app.dark_mode {
+                            egui::Color32::WHITE
+                        } else {
+                            egui::Color32::BLACK
+                        },
                     );
+
+                    // Bottom Right: Monitor Index
                     painter.text(
-                        egui::pos2(m_rect.right() - 12.0, m_rect.bottom() - 10.0),
+                        m_rect.right_bottom() - egui::vec2(12.0, 10.0),
                         egui::Align2::CENTER_CENTER,
                         format!("{}", i + 1),
                         egui::FontId::proportional(13.0),
-                        egui::Color32::WHITE,
+                        if app.dark_mode {
+                            egui::Color32::WHITE
+                        } else {
+                            egui::Color32::BLACK
+                        },
                     );
                 }
             }
@@ -309,7 +447,11 @@ fn draw_monitor_preview(app: &mut WindowManagerApp, ui: &mut egui::Ui, selected_
                     ui.painter().circle_filled(
                         dot_rect2.center(),
                         5.0,
-                        egui::Color32::from_rgb(76, 29, 149),
+                        if app.dark_mode {
+                            egui::Color32::from_rgb(76, 29, 149)
+                        } else {
+                            egui::Color32::from_rgb(139, 92, 246)
+                        },
                     );
 
                     ui.add_space(8.0);
@@ -320,7 +462,11 @@ fn draw_monitor_preview(app: &mut WindowManagerApp, ui: &mut egui::Ui, selected_
                     ui.painter().circle_filled(
                         dot_rect.center(),
                         5.0,
-                        egui::Color32::from_rgb(20, 83, 45),
+                        if app.dark_mode {
+                            egui::Color32::from_rgb(20, 83, 45)
+                        } else {
+                            egui::Color32::from_rgb(34, 197, 94)
+                        },
                     );
                 });
             });
@@ -334,8 +480,16 @@ fn draw_monitor_preview(app: &mut WindowManagerApp, ui: &mut egui::Ui, selected_
                     let is_selected = i == app.selected_mon_idx;
 
                     let btn = if is_selected {
-                        egui::Button::new(egui::RichText::new(&label).color(egui::Color32::WHITE))
-                            .fill(egui::Color32::from_rgb(20, 83, 45)) // Selected button to match monitor color
+                        egui::Button::new(egui::RichText::new(&label).color(if app.dark_mode {
+                            egui::Color32::WHITE
+                        } else {
+                            egui::Color32::BLACK
+                        }))
+                        .fill(if app.dark_mode {
+                            egui::Color32::from_rgb(20, 83, 45)
+                        } else {
+                            egui::Color32::from_rgb(34, 197, 94)
+                        })
                     } else {
                         egui::Button::new(&label)
                     };

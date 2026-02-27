@@ -1,13 +1,13 @@
 [package]
 name = "DisplayWarp"
-version = "1.0.5"
+version = "1.0.6"
 edition = "2024"
 
 [package.metadata.winresource]
 OriginalFilename = "DisplayWarp.exe"
 LegalCopyright = "Copyright © 2026"
-ProductVersion = "1.0.5"
-FileVersion = "1.0.5"
+ProductVersion = "1.0.6"
+FileVersion = "1.0.6"
 FileDescription = "DisplayWarp"
 CompanyName = "GradeLabs"
 ProductName = "DisplayWarp"

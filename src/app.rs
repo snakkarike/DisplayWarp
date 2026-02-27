@@ -41,6 +41,8 @@ pub struct WindowManagerApp {
     pub logo_texture: Option<eframe::egui::TextureHandle>,
     // ── Shared ──
     pub status_message: Arc<parking_lot::Mutex<String>>,
+    // ── Theme ──
+    pub dark_mode: bool,
 }
 
 impl Default for WindowManagerApp {
@@ -68,6 +70,7 @@ impl Default for WindowManagerApp {
             show_close_dialog: false,
             logo_texture: None,
             status_message: Arc::new(parking_lot::Mutex::new(String::from("Ready."))),
+            dark_mode: true,
         };
         app.refresh_monitors();
         app.refresh_live_processes();
