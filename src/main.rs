@@ -15,6 +15,7 @@ use windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx};
 
 fn main() -> eframe::Result {
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     // 1. Set DPI Awareness (Per-Monitor V2) so we see actual physical pixels
     // instead of virtualized scaled coordinates.
     unsafe {
@@ -31,10 +32,15 @@ fn main() -> eframe::Result {
     });
 
 =======
+=======
+>>>>>>> Stashed changes
     // Initialize COM for audio device enumeration/switching.
     unsafe {
         let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
     }
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
     // Decode the PNG icon for the window titlebar.
     let (icon_rgba, w, h) =
