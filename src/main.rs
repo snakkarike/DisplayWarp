@@ -4,7 +4,6 @@ mod app;
 mod audio;
 mod models;
 mod monitor;
-mod server;
 mod svg_render;
 mod tray;
 mod ui;
@@ -22,12 +21,6 @@ fn main() -> eframe::Result {
         };
         let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     }
-
-    // Start the Web Bridge server in a background thread.
-    std::thread::spawn(|| {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(server::start_server());
-    });
 
     // Initialize COM for audio device enumeration/switching.
     unsafe {

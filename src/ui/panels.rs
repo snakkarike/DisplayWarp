@@ -1037,7 +1037,7 @@ pub fn draw_status_bar(app: &WindowManagerApp, ui: &mut egui::Ui) {
         ))
         .show(ui, |ui| {
             ui.set_min_width(ui.available_width());
-            ui.set_max_height(80.0);
+            ui.set_min_height(ui.available_height());
 
             egui::ScrollArea::vertical()
                 .id_salt("status_log_scroll")

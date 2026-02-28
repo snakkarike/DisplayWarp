@@ -102,18 +102,13 @@ impl eframe::App for WindowManagerApp {
 
         ctx.set_style(style);
 
-        // ── Bottom Bar: Log + Version + Theme Toggle ─────────────────────────────
+        // ── Bottom Bar: Version + Theme Toggle ─────────────────────────────
         egui::TopBottomPanel::bottom("bottom_bar")
             .resizable(false)
             .show(ctx, |ui| {
                 egui::Frame::NONE
                     .inner_margin(egui::Margin::same(8))
                     .show(ui, |ui| {
-                        // The actual Log (Status Message)
-                        panels::draw_status_bar(self, ui);
-
-                        ui.add_space(4.0);
-
                         ui.horizontal(|ui| {
                             ui.label(egui::RichText::new("v1.0.6").small().color(
                                 if self.dark_mode {
@@ -164,8 +159,8 @@ impl eframe::App for WindowManagerApp {
 
                     ui.add_space(8.0);
 
-                    // 3-Column Grid: Live Mover | New Profile | Saved Profiles
-                    ui.columns(3, |cols| {
+                    // 4-Column Grid: Live Mover | New Profile | Saved Profiles | Log
+                    ui.columns(4, |cols| {
                         let col_height = 540.0; // Fixed height for columns to avoid infinite scroll expansion issues or pushing content off
 
                         // Col 1: Move Live Window
@@ -266,6 +261,41 @@ impl eframe::App for WindowManagerApp {
                                         .show(ui, |ui| {
                                             panels::draw_profiles_list(self, ui);
                                         });
+                                });
+                        });
+
+                        // Col 4: Log
+                        cols[3].vertical(|ui| {
+                            ui.set_min_height(col_height);
+                            egui::Frame::group(ui.style())
+                                .inner_margin(egui::Margin::same(12))
+                                .corner_radius(egui::CornerRadius::same(8))
+                                .fill(if self.dark_mode {
+                                    egui::Color32::from_rgb(25, 25, 25)
+                                } else {
+                                    egui::Color32::from_rgb(248, 250, 252)
+                                })
+                                .stroke(egui::Stroke::new(
+                                    1.0,
+                                    if self.dark_mode {
+                                        egui::Color32::from_rgb(44, 44, 44)
+                                    } else {
+                                        egui::Color32::from_rgb(226, 232, 240)
+                                    },
+                                ))
+                                .show(ui, |ui| {
+                                    ui.set_width(ui.available_width());
+                                    ui.set_min_height(ui.available_height());
+                                    ui.label(
+                                        egui::RichText::new(format!(
+                                            "{} Log",
+                                            regular::TERMINAL_WINDOW
+                                        ))
+                                        .size(14.0)
+                                        .strong(),
+                                    );
+                                    ui.add_space(8.0);
+                                    panels::draw_status_bar(self, ui);
                                 });
                         });
                     });
@@ -502,8 +532,8 @@ fn hide_native_window(_ctx: &egui::Context) {
     if let Some(hwnd) = get_eframe_hwnd() {
         unsafe {
             use windows::Win32::UI::WindowsAndMessaging::{
-                GWL_EXSTYLE, GetWindowLongW, SW_HIDE, SW_SHOWMINNOACTIVE, SetWindowLongW,
-                ShowWindow, WS_EX_TOOLWINDOW,
+                GetWindowLongW, SetWindowLongW, ShowWindow, GWL_EXSTYLE, SW_HIDE,
+                SW_SHOWMINNOACTIVE, WS_EX_TOOLWINDOW,
             };
             let _ = ShowWindow(hwnd, SW_HIDE);
             let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
@@ -515,8 +545,8 @@ fn hide_native_window(_ctx: &egui::Context) {
 
 fn get_eframe_hwnd() -> Option<windows::Win32::Foundation::HWND> {
     unsafe {
-        use windows::Win32::UI::WindowsAndMessaging::FindWindowW;
         use windows::core::w;
+        use windows::Win32::UI::WindowsAndMessaging::FindWindowW;
         match FindWindowW(None, w!("Display Warp")) {
             Ok(hwnd) if !hwnd.0.is_null() => Some(hwnd),
             _ => None,
