@@ -967,20 +967,9 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                 let target = app.monitors[app.live_move_mon_idx].rect;
                 WindowManagerApp::move_live_window(
                     hwnd,
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
                     target.into(),
                     Arc::clone(&app.status_message),
-=======
-                    target,
-                    Arc::clone(&app.status_message),
                     Arc::clone(&app.status_log),
->>>>>>> Stashed changes
-=======
-                    target,
-                    Arc::clone(&app.status_message),
-                    Arc::clone(&app.status_log),
->>>>>>> Stashed changes
                 );
             }
         }

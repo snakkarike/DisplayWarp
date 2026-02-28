@@ -1,11 +1,11 @@
 use std::os::windows::process::CommandExt;
+use windows::core::{Interface, Result, GUID, HSTRING, PCWSTR};
 use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
 use windows::Win32::Media::Audio::{
-    AUDCLNT_SHAREMODE_SHARED, DEVICE_STATE_ACTIVE, IAudioClient, IAudioRenderClient, IMMDevice,
-    IMMDeviceCollection, IMMDeviceEnumerator, MMDeviceEnumerator, eConsole, eRender,
+    eConsole, eRender, IAudioClient, IAudioRenderClient, IMMDevice, IMMDeviceCollection,
+    IMMDeviceEnumerator, MMDeviceEnumerator, AUDCLNT_SHAREMODE_SHARED, DEVICE_STATE_ACTIVE,
 };
-use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree, STGM_READ};
-use windows::core::{GUID, HSTRING, Interface, PCWSTR, Result};
+use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, CLSCTX_ALL, STGM_READ};
 
 // ─── IPolicyConfig COM Interface (Undocumented) ──────────────────────────────
 
@@ -218,14 +218,14 @@ Add-Type -TypeDefinition $code
         ])
         .creation_flags(0x08000000) // CREATE_NO_WINDOW
         .output()
-        .map_err(|e| {
+        .map_err(|_e| {
             windows::core::Error::from_hresult(windows::core::HRESULT(0x80004005_u32 as i32))
         })?;
 
     if output.status.success() {
         Ok(())
     } else {
-        let stderr = String::from_utf8_lossy(&output.stderr);
+        let _stderr = String::from_utf8_lossy(&output.stderr);
         Err(windows::core::Error::from_hresult(windows::core::HRESULT(
             0x80004005_u32 as i32,
         )))

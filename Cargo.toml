@@ -26,12 +26,7 @@ windows = { version = "0.62.2", features = [
     "Win32_Graphics_Gdi",
     "Win32_UI_WindowsAndMessaging",
     "Win32_System_Threading",
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
     "Win32_UI_HiDpi",
-=======
-=======
->>>>>>> Stashed changes
     "Win32_Media_Audio",
     "Win32_Devices_Properties",
     "Win32_Devices_FunctionDiscovery",
@@ -43,8 +38,6 @@ windows = { version = "0.62.2", features = [
     "Win32_System_Variant",
     "Win32_System_Diagnostics",
     "Win32_System_Diagnostics_Debug",
-<<<<<<< Updated upstream
-=======
 ] }
 windows-sys = { version = "0.61.2", features = [
     "Win32_Foundation",
@@ -53,16 +46,6 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_System_Com",
     "Win32_System_Com_StructuredStorage",
     "Win32_System_Variant",
->>>>>>> Stashed changes
-] }
-windows-sys = { version = "0.61.2", features = [
-    "Win32_Foundation",
-    "Win32_Media_Audio",
-    "Win32_UI_Shell_PropertiesSystem",
-    "Win32_System_Com",
-    "Win32_System_Com_StructuredStorage",
-    "Win32_System_Variant",
->>>>>>> Stashed changes
 ] }
 axum = { version = "0.7", features = ["ws"] }
 tokio = { version = "1.0", features = ["full"] }

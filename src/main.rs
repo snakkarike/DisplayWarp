@@ -11,16 +11,14 @@ mod ui;
 mod window;
 
 use eframe::egui;
-use windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx};
+use windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
 
 fn main() -> eframe::Result {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
     // 1. Set DPI Awareness (Per-Monitor V2) so we see actual physical pixels
     // instead of virtualized scaled coordinates.
     unsafe {
         use windows::Win32::UI::HiDpi::{
-            DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext,
+            SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
         };
         let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     }
@@ -31,17 +29,10 @@ fn main() -> eframe::Result {
         rt.block_on(server::start_server());
     });
 
-=======
-=======
->>>>>>> Stashed changes
     // Initialize COM for audio device enumeration/switching.
     unsafe {
         let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
     }
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
     // Decode the PNG icon for the window titlebar.
     let (icon_rgba, w, h) =
         svg_render::png_to_rgba(include_bytes!("../assets/DisplayWarpIcon.png"));
