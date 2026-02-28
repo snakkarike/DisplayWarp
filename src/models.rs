@@ -26,6 +26,10 @@ pub struct AppProfile {
     /// app's window stays on the target monitor.
     #[serde(default)]
     pub persistent_monitor: bool,
+    /// Optional: target audio output device ID. If set, switching to this device
+    /// will be attempted on launch/move.
+    #[serde(default)]
+    pub target_audio_device_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Default)]

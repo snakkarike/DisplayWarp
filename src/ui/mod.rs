@@ -102,188 +102,173 @@ impl eframe::App for WindowManagerApp {
 
         ctx.set_style(style);
 
-        // ── Bottom Bar: Version + Theme Toggle ─────────────────────────────
+        // ── Bottom Bar: Log + Version + Theme Toggle ─────────────────────────────
         egui::TopBottomPanel::bottom("bottom_bar")
             .resizable(false)
             .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label(
-                        egui::RichText::new("v1.0.6")
-                            .small()
-                            .color(if self.dark_mode {
-                                egui::Color32::GRAY
-                            } else {
-                                egui::Color32::from_gray(100)
-                            }),
-                    );
+                egui::Frame::NONE
+                    .inner_margin(egui::Margin::same(8))
+                    .show(ui, |ui| {
+                        // The actual Log (Status Message)
+                        panels::draw_status_bar(self, ui);
 
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let theme_icon = if self.dark_mode {
-                            regular::SUN
-                        } else {
-                            regular::MOON
-                        };
-                        if ui.button(theme_icon).clicked() {
-                            self.dark_mode = !self.dark_mode;
-                        }
+                        ui.add_space(4.0);
+
+                        ui.horizontal(|ui| {
+                            ui.label(egui::RichText::new("v1.0.6").small().color(
+                                if self.dark_mode {
+                                    egui::Color32::GRAY
+                                } else {
+                                    egui::Color32::from_gray(100)
+                                },
+                            ));
+
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    let theme_icon = if self.dark_mode {
+                                        regular::SUN
+                                    } else {
+                                        regular::MOON
+                                    };
+                                    if ui.button(theme_icon).clicked() {
+                                        self.dark_mode = !self.dark_mode;
+                                    }
+                                },
+                            );
+                        });
                     });
-                });
             });
 
         // ── Central: everything else ─────────────────────────────────────
         egui::CentralPanel::default().show(ctx, |ui| {
-            // Header: Logo
-            if let Some(tex) = &self.logo_texture {
-                ui.image(egui::load::SizedTexture::new(
-                    tex.id(),
-                    egui::vec2(195.0, 30.0),
-                ));
-            }
-            ui.add_space(8.0);
+            egui::ScrollArea::vertical()
+                .auto_shrink([false; 2])
+                .show(ui, |ui| {
+                    // Header: Logo
+                    if let Some(tex) = &self.logo_texture {
+                        ui.image(egui::load::SizedTexture::new(
+                            tex.id(),
+                            egui::vec2(195.0, 30.0),
+                        ));
+                    }
+                    ui.add_space(8.0);
 
-            // Monitor layout preview
-            let preview_idx = if self.editing_profile_idx.is_some() {
-                self.edit_profile_mon_idx
-            } else {
-                self.selected_mon_idx
-            };
-            draw_monitor_preview(self, ui, Some(preview_idx));
+                    // Monitor layout preview
+                    let preview_idx = if self.editing_profile_idx.is_some() {
+                        self.edit_profile_mon_idx
+                    } else {
+                        self.selected_mon_idx
+                    };
+                    draw_monitor_preview(self, ui, Some(preview_idx));
 
-            ui.add_space(8.0);
+                    ui.add_space(8.0);
 
-            // 3-Column Grid: Live Mover | New Profile | Saved Profiles
-            ui.columns(3, |cols| {
-                let col_height = cols[0].available_height();
+                    // 3-Column Grid: Live Mover | New Profile | Saved Profiles
+                    ui.columns(3, |cols| {
+                        let col_height = 540.0; // Fixed height for columns to avoid infinite scroll expansion issues or pushing content off
 
-                // Col 1: Move Live Window
-                cols[0].vertical(|ui| {
-                    ui.set_min_height(col_height);
-                    egui::Frame::group(ui.style())
-                        .inner_margin(egui::Margin::same(12))
-                        .corner_radius(egui::CornerRadius::same(8))
-                        .fill(if self.dark_mode {
-                            egui::Color32::from_rgb(25, 25, 25)
-                        } else {
-                            egui::Color32::from_rgb(248, 250, 252)
-                        })
-                        .stroke(egui::Stroke::new(
-                            1.0,
-                            if self.dark_mode {
-                                egui::Color32::from_rgb(44, 44, 44)
-                            } else {
-                                egui::Color32::from_rgb(226, 232, 240)
-                            },
-                        ))
-                        .show(ui, |ui| {
-                            ui.set_width(ui.available_width());
-                            ui.set_min_height(ui.available_height());
-                            panels::draw_live_process_mover(self, ui);
-                        });
-                });
-
-                // Col 2: New Profile
-                cols[1].vertical(|ui| {
-                    ui.set_min_height(col_height);
-                    egui::Frame::group(ui.style())
-                        .inner_margin(egui::Margin::same(12))
-                        .corner_radius(egui::CornerRadius::same(8))
-                        .fill(if self.dark_mode {
-                            egui::Color32::from_rgb(25, 25, 25)
-                        } else {
-                            egui::Color32::from_rgb(248, 250, 252)
-                        })
-                        .stroke(egui::Stroke::new(
-                            1.0,
-                            if self.dark_mode {
-                                egui::Color32::from_rgb(44, 44, 44)
-                            } else {
-                                egui::Color32::from_rgb(226, 232, 240)
-                            },
-                        ))
-                        .show(ui, |ui| {
-                            ui.set_width(ui.available_width());
-                            ui.set_min_height(ui.available_height());
-                            ui.label(
-                                egui::RichText::new(format!(
-                                    "{} New Profile",
-                                    regular::PLUS_CIRCLE
+                        // Col 1: Move Live Window
+                        cols[0].vertical(|ui| {
+                            ui.set_min_height(col_height);
+                            egui::Frame::group(ui.style())
+                                .inner_margin(egui::Margin::same(12))
+                                .corner_radius(egui::CornerRadius::same(8))
+                                .fill(if self.dark_mode {
+                                    egui::Color32::from_rgb(25, 25, 25)
+                                } else {
+                                    egui::Color32::from_rgb(248, 250, 252)
+                                })
+                                .stroke(egui::Stroke::new(
+                                    1.0,
+                                    if self.dark_mode {
+                                        egui::Color32::from_rgb(44, 44, 44)
+                                    } else {
+                                        egui::Color32::from_rgb(226, 232, 240)
+                                    },
                                 ))
-                                .size(14.0)
-                                .strong(),
-                            );
-                            ui.add_space(8.0);
-                            panels::draw_new_profile_form(self, ui);
-                        });
-                });
-
-                // Col 3: Saved Profiles
-                cols[2].vertical(|ui| {
-                    ui.set_min_height(col_height);
-                    egui::Frame::group(ui.style())
-                        .inner_margin(egui::Margin::same(12))
-                        .corner_radius(egui::CornerRadius::same(8))
-                        .fill(if self.dark_mode {
-                            egui::Color32::from_rgb(25, 25, 25)
-                        } else {
-                            egui::Color32::from_rgb(248, 250, 252)
-                        })
-                        .stroke(egui::Stroke::new(
-                            1.0,
-                            if self.dark_mode {
-                                egui::Color32::from_rgb(44, 44, 44)
-                            } else {
-                                egui::Color32::from_rgb(226, 232, 240)
-                            },
-                        ))
-                        .show(ui, |ui| {
-                            ui.set_width(ui.available_width());
-                            ui.set_min_height(ui.available_height());
-                            ui.label(
-                                egui::RichText::new(format!(
-                                    "{} Saved Profiles",
-                                    regular::BOOKMARK_SIMPLE
-                                ))
-                                .size(14.0)
-                                .strong(),
-                            );
-                            ui.add_space(8.0);
-                            egui::ScrollArea::vertical()
-                                .auto_shrink([false; 2])
-                                .id_salt("saved_profiles_scroll")
                                 .show(ui, |ui| {
-                                    panels::draw_profiles_list(self, ui);
+                                    ui.set_width(ui.available_width());
+                                    ui.set_min_height(ui.available_height());
+                                    panels::draw_live_process_mover(self, ui);
                                 });
                         });
-                });
-            });
 
-            ui.add_space(8.0);
+                        // Col 2: New Profile
+                        cols[1].vertical(|ui| {
+                            ui.set_min_height(col_height);
+                            egui::Frame::group(ui.style())
+                                .inner_margin(egui::Margin::same(12))
+                                .corner_radius(egui::CornerRadius::same(8))
+                                .fill(if self.dark_mode {
+                                    egui::Color32::from_rgb(25, 25, 25)
+                                } else {
+                                    egui::Color32::from_rgb(248, 250, 252)
+                                })
+                                .stroke(egui::Stroke::new(
+                                    1.0,
+                                    if self.dark_mode {
+                                        egui::Color32::from_rgb(44, 44, 44)
+                                    } else {
+                                        egui::Color32::from_rgb(226, 232, 240)
+                                    },
+                                ))
+                                .show(ui, |ui| {
+                                    ui.set_width(ui.available_width());
+                                    ui.set_min_height(ui.available_height());
+                                    ui.label(
+                                        egui::RichText::new(format!(
+                                            "{} New Profile",
+                                            regular::PLUS_CIRCLE
+                                        ))
+                                        .size(14.0)
+                                        .strong(),
+                                    );
+                                    ui.add_space(8.0);
+                                    panels::draw_new_profile_form(self, ui);
+                                });
+                        });
 
-            // Log Block (Below the 3 columns)
-            egui::Frame::group(ui.style())
-                .inner_margin(egui::Margin::same(12))
-                .corner_radius(egui::CornerRadius::same(8))
-                .fill(if self.dark_mode {
-                    egui::Color32::from_rgb(25, 25, 25)
-                } else {
-                    egui::Color32::from_rgb(248, 250, 252)
-                })
-                .stroke(egui::Stroke::new(
-                    1.0,
-                    if self.dark_mode {
-                        egui::Color32::from_rgb(44, 44, 44)
-                    } else {
-                        egui::Color32::from_rgb(226, 232, 240)
-                    },
-                ))
-                .show(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    ui.label(
-                        egui::RichText::new(format!("{} Log", regular::NOTE_PENCIL))
-                            .size(14.0)
-                            .strong(),
-                    );
-                    panels::draw_status_bar(self, ui);
+                        // Col 3: Saved Profiles
+                        cols[2].vertical(|ui| {
+                            ui.set_min_height(col_height);
+                            egui::Frame::group(ui.style())
+                                .inner_margin(egui::Margin::same(12))
+                                .corner_radius(egui::CornerRadius::same(8))
+                                .fill(if self.dark_mode {
+                                    egui::Color32::from_rgb(25, 25, 25)
+                                } else {
+                                    egui::Color32::from_rgb(248, 250, 252)
+                                })
+                                .stroke(egui::Stroke::new(
+                                    1.0,
+                                    if self.dark_mode {
+                                        egui::Color32::from_rgb(44, 44, 44)
+                                    } else {
+                                        egui::Color32::from_rgb(226, 232, 240)
+                                    },
+                                ))
+                                .show(ui, |ui| {
+                                    ui.set_width(ui.available_width());
+                                    ui.set_min_height(ui.available_height());
+                                    ui.label(
+                                        egui::RichText::new(format!(
+                                            "{} Saved Profiles",
+                                            regular::BOOKMARK_SIMPLE
+                                        ))
+                                        .size(14.0)
+                                        .strong(),
+                                    );
+                                    ui.add_space(8.0);
+                                    egui::ScrollArea::vertical()
+                                        .auto_shrink([false; 2])
+                                        .id_salt("saved_profiles_scroll")
+                                        .show(ui, |ui| {
+                                            panels::draw_profiles_list(self, ui);
+                                        });
+                                });
+                        });
+                    });
                 });
         });
     }

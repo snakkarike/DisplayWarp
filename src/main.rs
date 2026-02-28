@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app;
+mod audio;
 mod models;
 mod monitor;
 mod server;
@@ -10,8 +11,10 @@ mod ui;
 mod window;
 
 use eframe::egui;
+use windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx};
 
 fn main() -> eframe::Result {
+<<<<<<< Updated upstream
     // 1. Set DPI Awareness (Per-Monitor V2) so we see actual physical pixels
     // instead of virtualized scaled coordinates.
     unsafe {
@@ -27,6 +30,12 @@ fn main() -> eframe::Result {
         rt.block_on(server::start_server());
     });
 
+=======
+    // Initialize COM for audio device enumeration/switching.
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+    }
+>>>>>>> Stashed changes
     // Decode the PNG icon for the window titlebar.
     let (icon_rgba, w, h) =
         svg_render::png_to_rgba(include_bytes!("../assets/DisplayWarpIcon.png"));
