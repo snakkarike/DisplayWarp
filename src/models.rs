@@ -28,34 +28,12 @@ pub struct AppProfile {
     pub persistent_monitor: bool,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct SerializableRect {
     pub left: i32,
     pub top: i32,
     pub right: i32,
     pub bottom: i32,
-}
-
-impl From<SerializableRect> for RECT {
-    fn from(s: SerializableRect) -> Self {
-        Self {
-            left: s.left,
-            top: s.top,
-            right: s.right,
-            bottom: s.bottom,
-        }
-    }
-}
-
-impl From<RECT> for SerializableRect {
-    fn from(r: RECT) -> Self {
-        Self {
-            left: r.left,
-            top: r.top,
-            right: r.right,
-            bottom: r.bottom,
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -65,9 +43,9 @@ pub struct SavedData {
 
 // ─── Runtime State ───────────────────────────────────────────────────────────
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct MonitorInfo {
-    pub rect: SerializableRect,
+    pub rect: RECT,
     pub device_name: String,
 }
 
