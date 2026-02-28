@@ -16,34 +16,41 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::BOOL;
 
-// ─── Public types ─────────────────────────────────────────────────────────────
-
 use serde::{Deserialize, Serialize};
 
-/// A visible top-level window that can be moved by the user.
+// ─── Public types ─────────────────────────────────────────────────────────────
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ProcessEntry {
     pub hwnd: isize,
     #[allow(dead_code)]
     pub pid: u32,
-    /// Full path to the executable, if it could be retrieved
     pub exe_path: Option<std::path::PathBuf>,
-    /// Display label: "ExeName.exe — Window Title"
     pub label: String,
 }
 
 unsafe impl Send for ProcessEntry {}
 unsafe impl Sync for ProcessEntry {}
 
-// ─── Internal helper structs ─────────────────────────────────────────────────
+/// Rich result returned by window-find functions so callers can log details.
+pub struct WindowFound {
+    pub hwnd: HWND,
+    pub width: i32,
+    pub height: i32,
+    pub elapsed_ms: u64,
+}
+
+// ─── Internal helper structs ──────────────────────────────────────────────────
 
 struct WindowCandidate {
     hwnd: HWND,
     score: i32,
+    width: i32,
+    height: i32,
 }
 
 struct FindWindowByNameData {
-    target_name: String, // lowercase
+    target_name: String,
     candidates: Vec<WindowCandidate>,
 }
 
@@ -52,14 +59,24 @@ struct FindWindowData {
     hwnd: HWND,
 }
 
-// ─── Public API ──────────────────────────────────────────────────────────────
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 /// Poll for a visible, top-level window owned by `pid`. Waits up to `timeout_ms`.
-pub fn wait_for_window(pid: u32, timeout_ms: u64) -> Option<HWND> {
-    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms);
+pub fn wait_for_window(pid: u32, timeout_ms: u64) -> Option<WindowFound> {
+    let start = std::time::Instant::now();
+    let deadline = start + std::time::Duration::from_millis(timeout_ms);
     loop {
-        if let Some(h) = find_main_window_by_pid(pid) {
-            return Some(h);
+        if let Some(hwnd) = find_main_window_by_pid(pid) {
+            let mut wr = RECT::default();
+            unsafe {
+                let _ = GetWindowRect(hwnd, &mut wr);
+            }
+            return Some(WindowFound {
+                hwnd,
+                width: wr.right - wr.left,
+                height: wr.bottom - wr.top,
+                elapsed_ms: start.elapsed().as_millis() as u64,
+            });
         }
         if std::time::Instant::now() >= deadline {
             return None;
@@ -68,14 +85,20 @@ pub fn wait_for_window(pid: u32, timeout_ms: u64) -> Option<HWND> {
     }
 }
 
-/// Poll for a visible window whose owning process exe name matches `process_name` (case-insensitive).
-/// Useful when a launcher spawns a different child process (e.g. Battle.net → actual game).
-pub fn wait_for_window_by_name(process_name: &str, timeout_ms: u64) -> Option<HWND> {
+/// Poll for a visible window whose owning process exe name matches `process_name`
+/// (case-insensitive). Returns rich info about the found window.
+pub fn wait_for_window_by_name(process_name: &str, timeout_ms: u64) -> Option<WindowFound> {
     let target = process_name.to_lowercase();
-    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms);
+    let start = std::time::Instant::now();
+    let deadline = start + std::time::Duration::from_millis(timeout_ms);
+
     loop {
-        if let Some(h) = find_window_by_process_name(&target) {
-            return Some(h);
+        if let Some(found) = find_best_window_by_process_name(&target) {
+            let elapsed_ms = start.elapsed().as_millis() as u64;
+            return Some(WindowFound {
+                elapsed_ms,
+                ..found
+            });
         }
         if std::time::Instant::now() >= deadline {
             return None;
@@ -85,6 +108,10 @@ pub fn wait_for_window_by_name(process_name: &str, timeout_ms: u64) -> Option<HW
 }
 
 pub fn find_window_by_process_name(target_lowercase: &str) -> Option<HWND> {
+    find_best_window_by_process_name(target_lowercase).map(|f| f.hwnd)
+}
+
+fn find_best_window_by_process_name(target_lowercase: &str) -> Option<WindowFound> {
     let mut data = FindWindowByNameData {
         target_name: target_lowercase.to_string(),
         candidates: Vec::new(),
@@ -95,11 +122,17 @@ pub fn find_window_by_process_name(target_lowercase: &str) -> Option<HWND> {
             LPARAM(&mut data as *mut _ as isize),
         );
     }
-    // Pick highest-scoring candidate
-    data.candidates
-        .into_iter()
-        .max_by_key(|c| c.score)
-        .map(|c| c.hwnd)
+    let best = data.candidates.into_iter().max_by_key(|c| c.score)?;
+    if best.score > 0 {
+        Some(WindowFound {
+            hwnd: best.hwnd,
+            width: best.width,
+            height: best.height,
+            elapsed_ms: 0,
+        })
+    } else {
+        None
+    }
 }
 
 unsafe extern "system" fn enum_window_by_name_callback(hwnd: HWND, lparam: LPARAM) -> BOOL {
@@ -125,32 +158,51 @@ unsafe extern "system" fn enum_window_by_name_callback(hwnd: HWND, lparam: LPARA
             .is_ok()
             {
                 let full_path = String::from_utf16_lossy(&buf[..len as usize]).to_lowercase();
-                let exe_name = full_path.split(['/', '\\']).last().unwrap_or("");
+                let exe_name = full_path
+                    .trim_matches('\0')
+                    .split(['/', '\\'])
+                    .last()
+                    .unwrap_or("")
+                    .to_string();
+
                 if exe_name == data.target_name {
-                    // Score this candidate:
                     let mut score: i32 = 0;
-                    // Prefer windows with a title (loader windows often have no title)
-                    let title_len = GetWindowTextLengthW(hwnd);
-                    if title_len > 0 {
-                        score += 20;
-                    }
-                    // Penalise tool windows (overlays, toasts, etc)
+                    let mut w = 0i32;
+                    let mut h = 0i32;
+
                     let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
                     if ex_style & WS_EX_TOOLWINDOW.0 != 0 {
                         score -= 50;
                     }
-                    // Prefer larger windows (game window will be biggest)
+
                     let mut wr = RECT::default();
                     if GetWindowRect(hwnd, &mut wr).is_ok() {
-                        let area = ((wr.right - wr.left) * (wr.bottom - wr.top)).max(0);
-                        score += (area / 10_000).min(100); // cap at +100
+                        w = wr.right - wr.left;
+                        h = wr.bottom - wr.top;
+                        let area = (w * h).max(0);
+                        if w < 480 || h < 270 {
+                            score -= 100;
+                        } else {
+                            score += (area / 10_000).min(200);
+                        }
                     }
-                    data.candidates.push(WindowCandidate { hwnd, score });
+
+                    let title_len = GetWindowTextLengthW(hwnd);
+                    if title_len > 0 {
+                        score += 20;
+                    }
+
+                    data.candidates.push(WindowCandidate {
+                        hwnd,
+                        score,
+                        width: w,
+                        height: h,
+                    });
                 }
             }
             let _ = windows::Win32::Foundation::CloseHandle(hproc);
         }
-        BOOL(1) // always keep enumerating to collect all candidates
+        BOOL(1)
     }
 }
 
@@ -179,33 +231,24 @@ unsafe extern "system" fn enum_window_callback(hwnd: HWND, lparam: LPARAM) -> BO
         GetWindowThreadProcessId(hwnd, Some(&mut window_pid));
         if window_pid == data.pid && IsWindowVisible(hwnd).as_bool() {
             data.hwnd = hwnd;
-            BOOL(0) // Stop enumeration — we have our window
+            BOOL(0)
         } else {
             BOOL(1)
         }
     }
 }
 
-/// Resolve the HMONITOR for a rect.
 fn monitor_for_rect(rect: RECT) -> HMONITOR {
     unsafe { MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST) }
 }
 
-/// Move a window to the target monitor rect in a single, non-flickering operation.
-/// Uses SetWindowPlacement to update Windows' internal monitor tracking (so
-/// minimize/maximize stays on the right screen) AND SetWindowPos for the
-/// immediate visual move.
 pub fn move_window_once(hwnd: HWND, target_rect: RECT) {
     let w = target_rect.right - target_rect.left;
     let h = target_rect.bottom - target_rect.top;
     unsafe {
-        // Bail if the window handle is no longer valid (e.g. app closed,
-        // or display layout change destroyed and recreated windows).
         if !IsWindow(Some(hwnd)).as_bool() {
             return;
         }
-
-        // 1. Read current placement to detect if the window is maximized.
         let mut placement = WINDOWPLACEMENT {
             length: std::mem::size_of::<WINDOWPLACEMENT>() as u32,
             ..Default::default()
@@ -214,8 +257,6 @@ pub fn move_window_once(hwnd: HWND, target_rect: RECT) {
         let was_maximized = placement.showCmd == SW_MAXIMIZE.0 as u32
             || placement.showCmd == SW_SHOWMAXIMIZED.0 as u32;
 
-        // 2. Update the "normal" (restored) position to be inside the target monitor.
-        //    This is what Windows uses to decide which monitor to maximize on.
         let win_w = (w * 3) / 4;
         let win_h = (h * 3) / 4;
         let win_x = target_rect.left + (w - win_w) / 2;
@@ -229,7 +270,6 @@ pub fn move_window_once(hwnd: HWND, target_rect: RECT) {
         placement.showCmd = SW_RESTORE.0 as u32;
         let _ = SetWindowPlacement(hwnd, &placement);
 
-        // 3. Visually move the window with SetWindowPos.
         let _ = SetWindowPos(
             hwnd,
             Some(HWND_TOP),
@@ -240,7 +280,6 @@ pub fn move_window_once(hwnd: HWND, target_rect: RECT) {
             SWP_SHOWWINDOW | SWP_FRAMECHANGED,
         );
 
-        // 4. If it was maximized, re-maximize on the new monitor.
         if was_maximized {
             let _ = ShowWindow(hwnd, SW_MAXIMIZE);
         }
@@ -250,81 +289,18 @@ pub fn move_window_once(hwnd: HWND, target_rect: RECT) {
     }
 }
 
-/// Move a window to the target monitor rect, retrying until it sticks,
-/// then watch it for 45 seconds and enforce position if the game moves it back.
-pub fn move_to_monitor(hwnd: HWND, target_rect: RECT) {
+/// Silently watch a window for `watch_secs` seconds and nudge it back if it
+/// drifts off the target monitor. Call this in a background thread after the
+/// initial move so it never blocks the caller.
+pub fn watch_window_on_monitor(hwnd: HWND, target_rect: RECT, watch_secs: u64) {
     let w = target_rect.right - target_rect.left;
     let h = target_rect.bottom - target_rect.top;
     let target_mon = monitor_for_rect(target_rect);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(watch_secs);
 
-    // ── Phase 1: aggressive initial placement (first ~6 s) ────────────────
-    for attempt in 0..12u32 {
-        unsafe {
-            if !IsWindow(Some(hwnd)).as_bool() {
-                return;
-            }
-            if attempt > 0 {
-                std::thread::sleep(std::time::Duration::from_millis(500));
-            }
-
-            // 1. Force restore and update placement so Windows knows which monitor we are on
-            let mut placement = WINDOWPLACEMENT {
-                length: std::mem::size_of::<WINDOWPLACEMENT>() as u32,
-                ..Default::default()
-            };
-            if GetWindowPlacement(hwnd, &mut placement).is_err() {
-                println!(
-                    "move_to_monitor: Failed to get window placement for {:?}",
-                    hwnd
-                );
-            }
-
-            // Set the restored position to be on the target monitor
-            let win_w = (w * 3) / 4;
-            let win_h = (h * 3) / 4;
-            let win_x = target_rect.left + (w - win_w) / 2;
-            let win_y = target_rect.top + (h - win_h) / 2;
-            placement.rcNormalPosition = RECT {
-                left: win_x,
-                top: win_y,
-                right: win_x + win_w,
-                bottom: win_y + win_h,
-            };
-            placement.showCmd = SW_RESTORE.0 as u32;
-            let _ = SetWindowPlacement(hwnd, &placement);
-
-            let _ = BringWindowToTop(hwnd);
-            let _ = SetForegroundWindow(hwnd);
-
-            // 2. Immediate visual move
-            let _ = SetWindowPos(
-                hwnd,
-                Some(HWND_TOP),
-                target_rect.left,
-                target_rect.top,
-                w,
-                h,
-                SWP_SHOWWINDOW | SWP_FRAMECHANGED,
-            );
-
-            // 3. Re-maximize on the new monitor
-            let _ = ShowWindow(hwnd, SW_MAXIMIZE);
-
-            std::thread::sleep(std::time::Duration::from_millis(150));
-            if MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) == target_mon {
-                break;
-            }
-        }
-    }
-
-    // ── Phase 2: gentle keep-alive watcher for 45 s ─────────────────────
-    // Only re-positions — does NOT call SW_MAXIMIZE — to avoid minimize/maximize flicker
-    // on exclusive-fullscreen games that still ignore SetWindowPos.
-    let watch_deadline = std::time::Instant::now() + std::time::Duration::from_secs(45);
-    while std::time::Instant::now() < watch_deadline {
+    while std::time::Instant::now() < deadline {
         std::thread::sleep(std::time::Duration::from_millis(1000));
         unsafe {
-            // Stop watching if window was destroyed.
             if !IsWindow(Some(hwnd)).as_bool() {
                 return;
             }
@@ -342,13 +318,93 @@ pub fn move_to_monitor(hwnd: HWND, target_rect: RECT) {
                     h,
                     SWP_SHOWWINDOW | SWP_FRAMECHANGED,
                 );
-                // No SW_MAXIMIZE here — avoids flicker on exclusive-fullscreen games
             }
         }
     }
 }
 
-/// Block until a process (by PID) exits, or forever if it cannot be opened.
+#[allow(dead_code)]
+pub fn move_to_monitor(hwnd: HWND, target_rect: RECT) {
+    let w = target_rect.right - target_rect.left;
+    let h = target_rect.bottom - target_rect.top;
+    let target_mon = monitor_for_rect(target_rect);
+
+    for attempt in 0..12u32 {
+        unsafe {
+            if !IsWindow(Some(hwnd)).as_bool() {
+                return;
+            }
+            if attempt > 0 {
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
+
+            let mut placement = WINDOWPLACEMENT {
+                length: std::mem::size_of::<WINDOWPLACEMENT>() as u32,
+                ..Default::default()
+            };
+            let _ = GetWindowPlacement(hwnd, &mut placement);
+
+            let win_w = (w * 3) / 4;
+            let win_h = (h * 3) / 4;
+            let win_x = target_rect.left + (w - win_w) / 2;
+            let win_y = target_rect.top + (h - win_h) / 2;
+            placement.rcNormalPosition = RECT {
+                left: win_x,
+                top: win_y,
+                right: win_x + win_w,
+                bottom: win_y + win_h,
+            };
+            placement.showCmd = SW_RESTORE.0 as u32;
+            let _ = SetWindowPlacement(hwnd, &placement);
+
+            let _ = BringWindowToTop(hwnd);
+            let _ = SetForegroundWindow(hwnd);
+
+            let _ = SetWindowPos(
+                hwnd,
+                Some(HWND_TOP),
+                target_rect.left,
+                target_rect.top,
+                w,
+                h,
+                SWP_SHOWWINDOW | SWP_FRAMECHANGED,
+            );
+
+            let _ = ShowWindow(hwnd, SW_MAXIMIZE);
+
+            std::thread::sleep(std::time::Duration::from_millis(150));
+            if MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) == target_mon {
+                break;
+            }
+        }
+    }
+
+    let watch_deadline = std::time::Instant::now() + std::time::Duration::from_secs(45);
+    while std::time::Instant::now() < watch_deadline {
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+        unsafe {
+            if !IsWindow(Some(hwnd)).as_bool() {
+                return;
+            }
+            if MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) != target_mon {
+                let _ = BringWindowToTop(hwnd);
+                let _ = SetForegroundWindow(hwnd);
+                let _ = ShowWindow(hwnd, SW_RESTORE);
+                std::thread::sleep(std::time::Duration::from_millis(60));
+                let _ = SetWindowPos(
+                    hwnd,
+                    Some(HWND_TOP),
+                    target_rect.left,
+                    target_rect.top,
+                    w,
+                    h,
+                    SWP_SHOWWINDOW | SWP_FRAMECHANGED,
+                );
+            }
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub fn wait_for_pid_exit(pid: u32) {
     unsafe {
@@ -359,10 +415,6 @@ pub fn wait_for_pid_exit(pid: u32) {
     }
 }
 
-// ─── Live process enumeration ────────────────────────────────────────────────
-
-/// Return all visible top-level windows (with a title, not tool-windows) as
-/// `ProcessEntry` items that the UI can present for the live-process mover.
 pub fn list_visible_windows() -> Vec<ProcessEntry> {
     let mut entries: Vec<ProcessEntry> = Vec::new();
     unsafe {
@@ -371,7 +423,6 @@ pub fn list_visible_windows() -> Vec<ProcessEntry> {
             LPARAM(&mut entries as *mut _ as isize),
         );
     }
-    // Sort by label for a stable, readable list
     entries.sort_by(|a, b| a.label.cmp(&b.label));
     entries
 }
@@ -381,12 +432,10 @@ unsafe extern "system" fn enum_visible_windows_callback(hwnd: HWND, lparam: LPAR
         if !IsWindowVisible(hwnd).as_bool() {
             return BOOL(1);
         }
-        // Skip tool windows
         let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
         if ex_style & WS_EX_TOOLWINDOW.0 != 0 {
             return BOOL(1);
         }
-        // Must have a title
         let title_len = GetWindowTextLengthW(hwnd);
         if title_len <= 0 {
             return BOOL(1);
@@ -414,7 +463,6 @@ unsafe extern "system" fn enum_visible_windows_callback(hwnd: HWND, lparam: LPAR
             .is_ok()
             {
                 let full = String::from_utf16_lossy(&buf[..len as usize]);
-                // Remove trailing nulls if any
                 let full = full.trim_matches('\0');
                 if !full.is_empty() {
                     exe_path = Some(std::path::PathBuf::from(full));

@@ -6,8 +6,8 @@ use windows::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromWindow}
 use crate::models::{AppProfile, MonitorInfo, SavedData};
 use crate::monitor::get_all_monitors;
 use crate::window::{
-    ProcessEntry, find_window_by_process_name, list_visible_windows, move_to_monitor,
-    move_window_once, wait_for_window, wait_for_window_by_name,
+    ProcessEntry, find_window_by_process_name, list_visible_windows, move_window_once,
+    wait_for_window, wait_for_window_by_name,
 };
 
 // ─── Application State ───────────────────────────────────────────────────────
@@ -175,6 +175,7 @@ impl WindowManagerApp {
                         _ => continue,
                     };
 
+                    // find_window_by_process_name returns Option<HWND> — fine for watcher
                     let hwnd = match find_window_by_process_name(&proc_name) {
                         Some(h) => h,
                         None => continue,
@@ -264,6 +265,12 @@ impl WindowManagerApp {
             }
         };
         let pid = child.id();
+        let exe_name = exe
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "app".to_string());
+
+        Self::push_status(&status, &log, format!("🚀 Launched {exe_name} (PID {pid})"));
 
         std::thread::spawn(move || {
             unsafe {
@@ -273,26 +280,21 @@ impl WindowManagerApp {
                 );
             }
 
-            if let Some(audio_id) = &audio_device_id {
-                Self::push_status(
-                    &status,
-                    &log,
-                    format!(
-                        "🔍 Trying audio ID: {}",
-                        &audio_id[..audio_id.len().min(60)]
-                    ),
-                );
+            // ── Audio ──────────────────────────────────────────────────────
+            if let Some(ref audio_id) = audio_device_id {
                 match crate::audio::set_default_audio_device(audio_id) {
-                    Ok(_) => {
-                        Self::push_status(&status, &log, "🎵 Audio switched, waiting for window…")
-                    }
+                    Ok(_) => Self::push_status(&status, &log, "🔊 Audio device switched."),
                     Err(e) => {
                         Self::push_status(&status, &log, format!("⚠️ Audio switch failed: {e}"))
                     }
                 }
             }
 
-            let hwnd = if let Some(proc_name) = window_process_name.filter(|s| !s.is_empty()) {
+            // ── Window detection ───────────────────────────────────────────
+            let target_w = target_rect.right - target_rect.left;
+            let target_h = target_rect.bottom - target_rect.top;
+
+            let found = if let Some(proc_name) = window_process_name.filter(|s| !s.is_empty()) {
                 Self::push_status(
                     &status,
                     &log,
@@ -300,31 +302,45 @@ impl WindowManagerApp {
                 );
                 wait_for_window_by_name(&proc_name, 30_000)
             } else {
-                Self::push_status(
-                    &status,
-                    &log,
-                    format!("⏳ Launched PID {pid}, waiting for window…"),
-                );
+                Self::push_status(&status, &log, format!("⏳ Waiting for PID {pid} window…"));
                 wait_for_window(pid, 15_000)
             };
 
-            match hwnd {
-                Some(h) => {
-                    move_to_monitor(h, target_rect);
+            // ── Move ───────────────────────────────────────────────────────
+            match found {
+                Some(f) => {
                     Self::push_status(
                         &status,
                         &log,
-                        match &audio_device_id {
-                            Some(_) => "✅ Window moved + audio switched.".to_string(),
-                            None => "✅ Window locked on target monitor.".to_string(),
-                        },
+                        format!(
+                            "🪟 Window found ({}×{}) after {:.1}s — moving to {}×{} display…",
+                            f.width,
+                            f.height,
+                            f.elapsed_ms as f32 / 1000.0,
+                            target_w,
+                            target_h,
+                        ),
                     );
+                    // Phase 1: aggressive initial placement (~6 s). Runs inline so
+                    // we know the window is on the right monitor before reporting done.
+                    move_window_once(f.hwnd, target_rect);
+                    Self::push_status(&status, &log, "✅ Done — window on target monitor.");
+                    // Phase 2: silent 45-second keep-alive watcher in background.
+                    // Does not block the status log.
+                    let hwnd_raw = f.hwnd.0 as isize;
+                    std::thread::spawn(move || {
+                        crate::window::watch_window_on_monitor(
+                            windows::Win32::Foundation::HWND(hwnd_raw as *mut _),
+                            target_rect,
+                            45,
+                        );
+                    });
                 }
                 None => {
                     Self::push_status(
                         &status,
                         &log,
-                        "⚠️ Window not found within timeout (app may still work normally).",
+                        "⚠️ Window not found within timeout. App may still have launched normally.",
                     );
                 }
             }

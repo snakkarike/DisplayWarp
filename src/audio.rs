@@ -1,17 +1,43 @@
-use std::os::windows::process::CommandExt;
-use windows::core::{Interface, Result, GUID, HSTRING, PCWSTR};
 use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
 use windows::Win32::Media::Audio::{
-    eConsole, eRender, IAudioClient, IAudioRenderClient, IMMDevice, IMMDeviceCollection,
-    IMMDeviceEnumerator, MMDeviceEnumerator, AUDCLNT_SHAREMODE_SHARED, DEVICE_STATE_ACTIVE,
+    AUDCLNT_SHAREMODE_SHARED, DEVICE_STATE_ACTIVE, IAudioClient, IAudioRenderClient, IMMDevice,
+    IMMDeviceCollection, IMMDeviceEnumerator, MMDeviceEnumerator, eConsole, eRender,
 };
-use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, CLSCTX_ALL, STGM_READ};
+use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree, STGM_READ};
+use windows::core::{GUID, HSTRING, Interface, PCWSTR, Result};
 
-// ─── IPolicyConfig COM Interface (Undocumented) ──────────────────────────────
+// ─── IPolicyConfig COM Interface (Undocumented) ───────────────────────────────
+//
+// Reversed by EreTIk, widely used since Windows 7.
+//
+// CLSID (CoCreateInstance class):  {870af99c-171d-4f9e-af0d-e63df40c2bc9}
+//   NOTE: The "4f9e" segment — many online sources mistakenly write "4f15".
+//
+// IID  (QueryInterface interface): {f8679f50-850a-41cf-9c72-430f290290c8}
+//   NOTE: This is NOT the same value as the CLSID. Using CLSID as IID silently
+//   returns a no-op stub on modern Windows instead of failing loudly.
+//
+// VTABLE (confirmed by C++ header, AHK ComCall(13,...), PureBasic, multiple sources):
+//   Slot  0 : QueryInterface      (IUnknown)
+//   Slot  1 : AddRef              (IUnknown)
+//   Slot  2 : Release             (IUnknown)
+//   Slot  3 : GetMixFormat
+//   Slot  4 : GetDeviceFormat
+//   Slot  5 : ResetDeviceFormat   ← commonly omitted, shifts everything by 1 if missing
+//   Slot  6 : SetDeviceFormat
+//   Slot  7 : GetProcessingPeriod
+//   Slot  8 : SetProcessingPeriod
+//   Slot  9 : GetShareMode
+//   Slot 10 : SetShareMode
+//   Slot 11 : GetPropertyValue
+//   Slot 12 : SetPropertyValue
+//   Slot 13 : SetDefaultEndpoint  ← confirmed slot 13
+//   Slot 14 : SetEndpointVisibility
 
 #[repr(C)]
 #[allow(non_snake_case)]
 struct IPolicyConfigVtbl {
+    // IUnknown
     pub QueryInterface: unsafe extern "system" fn(
         this: *mut std::ffi::c_void,
         iid: *const GUID,
@@ -19,8 +45,13 @@ struct IPolicyConfigVtbl {
     ) -> windows::core::HRESULT,
     pub AddRef: unsafe extern "system" fn(this: *mut std::ffi::c_void) -> u32,
     pub Release: unsafe extern "system" fn(this: *mut std::ffi::c_void) -> u32,
+    // IPolicyConfig — stubs for slots 3-12 (we only call slot 13)
+    pub GetMixFormat:
+        unsafe extern "system" fn(this: *mut std::ffi::c_void) -> windows::core::HRESULT,
     pub GetDeviceFormat:
         unsafe extern "system" fn(this: *mut std::ffi::c_void) -> windows::core::HRESULT,
+    pub ResetDeviceFormat:
+        unsafe extern "system" fn(this: *mut std::ffi::c_void) -> windows::core::HRESULT, // slot 5 — DO NOT remove
     pub SetDeviceFormat:
         unsafe extern "system" fn(this: *mut std::ffi::c_void) -> windows::core::HRESULT,
     pub GetProcessingPeriod:
@@ -35,6 +66,7 @@ struct IPolicyConfigVtbl {
         unsafe extern "system" fn(this: *mut std::ffi::c_void) -> windows::core::HRESULT,
     pub SetPropertyValue:
         unsafe extern "system" fn(this: *mut std::ffi::c_void) -> windows::core::HRESULT,
+    // Slot 13 — the method we actually use
     pub SetDefaultEndpoint: unsafe extern "system" fn(
         this: *mut std::ffi::c_void,
         pszDeviceName: PCWSTR,
@@ -47,7 +79,8 @@ struct IPolicyConfigVtbl {
 struct IPolicyConfig(windows::core::IUnknown);
 
 impl IPolicyConfig {
-    pub const IID: GUID = GUID::from_u128(0x870af99c_171d_4f15_af0d_73ed80116693);
+    // IID for QueryInterface — distinct from the CLSID used in CoCreateInstance
+    const IID: GUID = GUID::from_u128(0xf8679f50_850a_41cf_9c72_430f290290c8);
 
     pub unsafe fn set_default_endpoint(&self, psz_device_name: PCWSTR, role: i32) -> Result<()> {
         let vtable = self.0.as_raw() as *const *const IPolicyConfigVtbl;
@@ -59,6 +92,10 @@ unsafe impl Interface for IPolicyConfig {
     type Vtable = IPolicyConfigVtbl;
     const IID: GUID = Self::IID;
 }
+
+// CLSID for CoCreateInstance — CPolicyConfigClient
+// {870af99c-171d-4f9e-af0d-e63df40c2bc9}  ← "4f9e", not "4f15"
+const CLSID_POLICY_CONFIG: GUID = GUID::from_u128(0x870af99c_171d_4f9e_af0d_e63df40c2bc9);
 
 // ─── Device Enumeration ───────────────────────────────────────────────────────
 
@@ -145,91 +182,23 @@ pub fn get_default_audio_device_id() -> Result<String> {
     }
 }
 
-pub fn set_default_audio_device(device_id: &str) -> Result<()> {
-    // First try COM (IPolicyConfig) with all known CLSIDs
-    const CLSIDS: &[u128] = &[
-        0x294935ce_f637_4e7c_a41b_abed1990e54c,
-        0x6be54be8_a068_4875_a49d_0c2966473b90,
-        0xbcde0395_e52f_467c_8e3d_c4579291692e,
-        0x870af99c_171d_4f15_af0d_73ed80116693,
-    ];
+// ─── Set Default Audio Device ─────────────────────────────────────────────────
 
+pub fn set_default_audio_device(device_id: &str) -> Result<()> {
     unsafe {
         let hstring_id = HSTRING::from(device_id);
         let pcwstr_id = PCWSTR(hstring_id.as_ptr());
 
-        for &clsid_u128 in CLSIDS {
-            let clsid = GUID::from_u128(clsid_u128);
-            if let Ok(policy_config) =
-                CoCreateInstance::<_, IPolicyConfig>(&clsid, None, CLSCTX_ALL)
-            {
-                policy_config.set_default_endpoint(pcwstr_id, 0)?;
-                policy_config.set_default_endpoint(pcwstr_id, 1)?;
-                policy_config.set_default_endpoint(pcwstr_id, 2)?;
-                return Ok(());
-            }
-        }
+        let policy_config: IPolicyConfig =
+            CoCreateInstance(&CLSID_POLICY_CONFIG, None, CLSCTX_ALL)?;
+
+        // Set for all three roles: Console (0), Multimedia (1), Communications (2)
+        policy_config.set_default_endpoint(pcwstr_id, 0)?;
+        policy_config.set_default_endpoint(pcwstr_id, 1)?;
+        policy_config.set_default_endpoint(pcwstr_id, 2)?;
     }
 
-    // COM failed — fall back to PowerShell via AudioDeviceCmdlets
-    // This works on all Windows 10/11 systems
-    let script = format!(
-        r#"
-$deviceId = '{}'
-$code = @'
-using System.Runtime.InteropServices;
-[Guid("870AF99C-171D-4F15-AF0D-73ED80116693")]
-[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-interface IPolicyConfig {{
-    void unused0(); void unused1(); void unused2(); void unused3();
-    void unused4(); void unused5(); void unused6(); void unused7();
-    void unused8(); void unused9();
-    [PreserveSig] int SetDefaultEndpoint([MarshalAs(UnmanagedType.LPWStr)] string deviceId, int role);
-}}
-[Guid("294935CE-F637-4E7C-A41B-ABED1990E54C")]
-[ClassInterface(ClassInterfaceType.None)]
-[ComImport]
-class CPolicyConfig {{}}
-public class AudioSwitcher {{
-    public static void SetDefault(string id) {{
-        var cfg = (IPolicyConfig)new CPolicyConfig();
-        cfg.SetDefaultEndpoint(id, 0);
-        cfg.SetDefaultEndpoint(id, 1);
-        cfg.SetDefaultEndpoint(id, 2);
-    }}
-}}
-'@
-Add-Type -TypeDefinition $code
-[AudioSwitcher]::SetDefault($deviceId)
-"#,
-        device_id.replace('\'', "''")
-    );
-
-    let output = std::process::Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-WindowStyle",
-            "Hidden",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            &script,
-        ])
-        .creation_flags(0x08000000) // CREATE_NO_WINDOW
-        .output()
-        .map_err(|_e| {
-            windows::core::Error::from_hresult(windows::core::HRESULT(0x80004005_u32 as i32))
-        })?;
-
-    if output.status.success() {
-        Ok(())
-    } else {
-        let _stderr = String::from_utf8_lossy(&output.stderr);
-        Err(windows::core::Error::from_hresult(windows::core::HRESULT(
-            0x80004005_u32 as i32,
-        )))
-    }
+    Ok(())
 }
 
 // ─── Test Beep via WASAPI ─────────────────────────────────────────────────────
