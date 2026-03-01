@@ -40,6 +40,35 @@ pub struct SerializableRect {
     pub bottom: i32,
 }
 
+impl SerializableRect {
+    pub fn intersects_rect(&self, other: &windows::Win32::Foundation::RECT) -> bool {
+        self.left < other.right
+            && self.right > other.left
+            && self.top < other.bottom
+            && self.bottom > other.top
+    }
+
+    pub fn to_rect(&self) -> windows::Win32::Foundation::RECT {
+        windows::Win32::Foundation::RECT {
+            left: self.left,
+            top: self.top,
+            right: self.right,
+            bottom: self.bottom,
+        }
+    }
+}
+
+impl From<windows::Win32::Foundation::RECT> for SerializableRect {
+    fn from(r: windows::Win32::Foundation::RECT) -> Self {
+        Self {
+            left: r.left,
+            top: r.top,
+            right: r.right,
+            bottom: r.bottom,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct SavedData {
     pub profiles: Vec<AppProfile>,

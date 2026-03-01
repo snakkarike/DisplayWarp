@@ -1290,21 +1290,36 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                                 let width = orig_rect.right - orig_rect.left;
                                 let height = orig_rect.bottom - orig_rect.top;
 
-                                app.monitors[idx].rect.left =
+                                // 40px Grid Snapping
+                                let target_left =
                                     (orig_rect.left + delta_virtual_x).clamp(-16000, 16000);
-                                app.monitors[idx].rect.top =
+                                let target_top =
                                     (orig_rect.top + delta_virtual_y).clamp(-16000, 16000);
-                                app.monitors[idx].rect.right = app.monitors[idx].rect.left + width;
-                                app.monitors[idx].rect.bottom = app.monitors[idx].rect.top + height;
 
-                                // Snap primary monitor loosely to 0,0 grid if close
-                                if (app.monitors[idx].rect.left).abs() < 50
-                                    && (app.monitors[idx].rect.top).abs() < 50
-                                {
-                                    app.monitors[idx].rect.left = 0;
-                                    app.monitors[idx].rect.top = 0;
-                                    app.monitors[idx].rect.right = width;
-                                    app.monitors[idx].rect.bottom = height;
+                                let snapped_left = (target_left as f32 / 40.0).round() as i32 * 40;
+                                let snapped_top = (target_top as f32 / 40.0).round() as i32 * 40;
+
+                                let new_rect = crate::models::SerializableRect {
+                                    left: snapped_left,
+                                    top: snapped_top,
+                                    right: snapped_left + width,
+                                    bottom: snapped_top + height,
+                                };
+
+                                // Collision Detection
+                                let mut collision = false;
+                                for (other_idx, other_m) in app.monitors.iter().enumerate() {
+                                    if other_idx == idx {
+                                        continue;
+                                    }
+                                    if new_rect.intersects_rect(&other_m.rect) {
+                                        collision = true;
+                                        break;
+                                    }
+                                }
+
+                                if !collision {
+                                    app.monitors[idx].rect = new_rect.to_rect();
                                 }
                             }
                         }
