@@ -40,7 +40,7 @@ pub struct SerializableRect {
     pub bottom: i32,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize)]
 pub struct SavedData {
     pub profiles: Vec<AppProfile>,
     #[serde(default)]
@@ -49,6 +49,24 @@ pub struct SavedData {
     pub start_minimized: bool,
     #[serde(default)]
     pub start_on_boot: bool,
+    #[serde(default = "default_watcher_interval")]
+    pub watcher_interval_secs: u64,
+}
+
+impl Default for SavedData {
+    fn default() -> Self {
+        Self {
+            profiles: vec![],
+            close_to_tray: false,
+            start_minimized: false,
+            start_on_boot: false,
+            watcher_interval_secs: 3,
+        }
+    }
+}
+
+fn default_watcher_interval() -> u64 {
+    3
 }
 
 // ─── Runtime State ───────────────────────────────────────────────────────────

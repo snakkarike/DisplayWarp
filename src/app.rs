@@ -182,7 +182,10 @@ impl WindowManagerApp {
     fn start_watcher(data: Arc<parking_lot::Mutex<SavedData>>, running: Arc<AtomicBool>) {
         std::thread::spawn(move || {
             while running.load(Ordering::Relaxed) {
-                std::thread::sleep(std::time::Duration::from_secs(3));
+                // Dynamically grab the user interval to sleep
+                let sleep_duration = { data.lock().watcher_interval_secs };
+
+                std::thread::sleep(std::time::Duration::from_secs(sleep_duration));
                 if !running.load(Ordering::Relaxed) {
                     break;
                 }

@@ -372,6 +372,21 @@ impl eframe::App for WindowManagerApp {
                                                 }
                                             }
 
+                                            ui.add_space(8.0);
+                                            ui.label("Background Watcher Interval:");
+                                            
+                                            let mut interval = data.watcher_interval_secs;
+                                            if ui.add(egui::Slider::new(&mut interval, 1..=30).suffix(" seconds")).changed() {
+                                                data.watcher_interval_secs = interval;
+                                                dirty = true;
+                                            }
+                                            
+                                            ui.label(
+                                                egui::RichText::new("Controls how often DisplayWarp scans application placement to enforce persistence rules. Lower speeds save CPU.")
+                                                    .size(11.0)
+                                                    .color(egui::Color32::from_gray(140))
+                                            );
+
                                             if dirty {
                                                 drop(data);
                                                 self.save_data();
