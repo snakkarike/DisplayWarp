@@ -1089,7 +1089,7 @@ pub fn draw_status_bar(app: &WindowManagerApp, ui: &mut egui::Ui) {
 
 // ─── Display Layout Tab ──────────────────────────────────────────────────────
 
-pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
+pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available_h: f32) {
     if app.monitors.is_empty() {
         ui.vertical_centered(|ui| {
             ui.add_space(100.0);
@@ -1102,10 +1102,13 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
         return;
     }
 
-    ui.columns(2, |cols| {
+    let total_width = ui.available_width();
+    let col_height = available_h - 8.0;
+
+    ui.horizontal(|ui| {
         // Col 1: Interactive Canvas & Save Form
-        cols[0].vertical(|ui| {
-            ui.set_min_height(500.0);
+        ui.vertical(|ui| {
+            ui.set_width(total_width * 0.60 - 4.0);
             egui::Frame::group(ui.style())
                 .inner_margin(egui::Margin::same(12))
                 .corner_radius(egui::CornerRadius::same(8))
@@ -1123,6 +1126,8 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                     },
                 ))
                 .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+
                     ui.label(
                         egui::RichText::new(format!("{} Arrange Monitors", regular::CROP))
                             .size(16.0)
@@ -1132,7 +1137,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
 
                     // Interactive Dragging Canvas
                     let (response, painter) = ui.allocate_painter(
-                        egui::vec2(ui.available_width(), 320.0),
+                        egui::vec2(ui.available_width(), col_height - 145.0),
                         egui::Sense::drag(),
                     );
                     let rect = response.rect;
@@ -1206,8 +1211,10 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                                 let width = orig_rect.right - orig_rect.left;
                                 let height = orig_rect.bottom - orig_rect.top;
 
-                                app.monitors[idx].rect.left = orig_rect.left + delta_virtual_x;
-                                app.monitors[idx].rect.top = orig_rect.top + delta_virtual_y;
+                                app.monitors[idx].rect.left =
+                                    (orig_rect.left + delta_virtual_x).clamp(-16000, 16000);
+                                app.monitors[idx].rect.top =
+                                    (orig_rect.top + delta_virtual_y).clamp(-16000, 16000);
                                 app.monitors[idx].rect.right = app.monitors[idx].rect.left + width;
                                 app.monitors[idx].rect.bottom = app.monitors[idx].rect.top + height;
 
@@ -1338,8 +1345,9 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
         });
 
         // Col 2: Saved Display Profiles List
-        cols[1].vertical(|ui| {
-            ui.set_min_height(500.0);
+        ui.vertical(|ui| {
+            ui.set_width(total_width * 0.40 - 8.0);
+            ui.set_max_height(col_height);
             egui::Frame::group(ui.style())
                 .inner_margin(egui::Margin::same(12))
                 .corner_radius(egui::CornerRadius::same(8))
@@ -1357,6 +1365,8 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                     },
                 ))
                 .show(ui, |ui| {
+                    ui.set_min_width(ui.available_width());
+
                     ui.label(
                         egui::RichText::new(format!("{} Saved Profiles", regular::BOOKMARK_SIMPLE))
                             .size(16.0)

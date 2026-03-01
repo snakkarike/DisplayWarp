@@ -259,12 +259,8 @@ impl eframe::App for WindowManagerApp {
                         });
                 }
                 AppTab::Display => {
-                    egui::ScrollArea::vertical()
-                        .auto_shrink([false; 2])
-                        .id_salt("display_scroll")
-                        .show(ui, |ui| {
-                            panels::draw_display_tab(self, ui);
-                        });
+                    let available_h = ui.available_rect_before_wrap().height();
+                    panels::draw_display_tab(self, ui, available_h);
                 }
                 AppTab::Log => {
                     egui::ScrollArea::vertical()
