@@ -57,6 +57,8 @@ pub struct WindowManagerApp {
     pub markdown_cache: egui_commonmark::CommonMarkCache,
     // ── Theme ──
     pub dark_mode: bool,
+    // ── Startup State ──
+    pub first_frame_hidden: bool,
 }
 
 impl Default for WindowManagerApp {
@@ -91,6 +93,7 @@ impl Default for WindowManagerApp {
             status_log: Arc::new(parking_lot::Mutex::new(vec!["Ready.".to_string()])),
             markdown_cache: egui_commonmark::CommonMarkCache::default(),
             dark_mode: true,
+            first_frame_hidden: false,
         };
         app.refresh_monitors();
         app.refresh_audio_devices();

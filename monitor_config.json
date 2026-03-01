@@ -32,6 +32,6 @@
     }
   ],
   "close_to_tray": true,
-  "start_minimized": true,
+  "start_minimized": false,
   "start_on_boot": false
 }

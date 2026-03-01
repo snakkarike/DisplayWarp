@@ -11,6 +11,14 @@ impl eframe::App for WindowManagerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.request_repaint_after(std::time::Duration::from_millis(500));
 
+        // ── First Frame Hidden Override ────────────────────────────────────
+        if !self.first_frame_hidden {
+            self.first_frame_hidden = true;
+            if self.data.lock().start_minimized {
+                hide_native_window(ctx);
+            }
+        }
+
         // ── Intercept close ────────────────────────────────────────────────
         let close_requested = ctx.input(|i| i.viewport().close_requested());
         if close_requested {
