@@ -1,5 +1,7 @@
-![DisplayWarp Light Mode](https://raw.githubusercontent.com/snakkarike/DisplayWarp/main/assets/DisplayWarpLogo.png#gh-light-mode-only)
-![DisplayWarp Dark Mode](https://raw.githubusercontent.com/snakkarike/DisplayWarp/main/assets/DisplayWarpLogoDark.png#gh-dark-mode-only)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/DisplayWarpLogoDark.png">
+  <img alt="DisplayWarp" src="assets/DisplayWarpLogo.png">
+</picture>
 
 #### Launch any application on any monitor, every time. Move live windows instantly.
 
