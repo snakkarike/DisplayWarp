@@ -28,7 +28,7 @@ fn main() -> eframe::Result {
     }
     // Decode the PNG icon for the window titlebar.
     let (icon_rgba, w, h) =
-        svg_render::png_to_rgba(include_bytes!("../assets/DisplayWarpIcon.png"));
+        svg_render::png_to_rgba(include_bytes!("../assets/DisplayWarpIconTitlebar.png"));
     let icon = egui::IconData {
         rgba: icon_rgba,
         width: w,

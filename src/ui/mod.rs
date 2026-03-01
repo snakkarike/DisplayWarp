@@ -425,11 +425,19 @@ impl eframe::App for WindowManagerApp {
                                             );
                                             ui.add_space(8.0);
 
-                                            ui.add(
-                                                egui::Image::new(egui::include_image!("../../assets/DisplayWarpLogo.png"))
-                                                    .max_width(200.0)
-                                                    .maintain_aspect_ratio(true)
-                                            );
+                                            if self.dark_mode {
+                                                ui.add(
+                                                    egui::Image::new(egui::include_image!("../../assets/DisplayWarpLogoDark.png"))
+                                                        .max_width(200.0)
+                                                        .maintain_aspect_ratio(true)
+                                                );
+                                            } else {
+                                                ui.add(
+                                                    egui::Image::new(egui::include_image!("../../assets/DisplayWarpLogo.png"))
+                                                        .max_width(200.0)
+                                                        .maintain_aspect_ratio(true)
+                                                );
+                                            }
                                             ui.add_space(8.0);
 
                                             ui.label(egui::RichText::new("DisplayWarp").size(20.0).strong());
