@@ -69,7 +69,7 @@ fn show_window_native() {
         };
         use windows::core::w;
 
-        let hwnd = match FindWindowW(None, w!("Display Warp")) {
+        let hwnd = match FindWindowW(None, w!("DisplayWarp")) {
             Ok(h) if !h.0.is_null() => h,
             _ => return,
         };

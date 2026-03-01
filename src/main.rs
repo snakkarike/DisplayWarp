@@ -43,7 +43,7 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
     eframe::run_native(
-        "Display Warp",
+        "DisplayWarp",
         options,
         Box::new(move |cc| {
             // Register fonts.

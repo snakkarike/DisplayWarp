@@ -110,7 +110,7 @@ impl eframe::App for WindowManagerApp {
                     .inner_margin(egui::Margin::same(8))
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new("v1.0.7").color(
+                            ui.label(egui::RichText::new(format!("v{}", env!("CARGO_PKG_VERSION"))).color(
                                 if self.dark_mode {
                                     egui::Color32::GRAY
                                 } else {
@@ -709,7 +709,7 @@ fn get_eframe_hwnd() -> Option<windows::Win32::Foundation::HWND> {
     unsafe {
         use windows::Win32::UI::WindowsAndMessaging::FindWindowW;
         use windows::core::w;
-        match FindWindowW(None, w!("Display Warp")) {
+        match FindWindowW(None, w!("DisplayWarp")) {
             Ok(hwnd) if !hwnd.0.is_null() => Some(hwnd),
             _ => None,
         }

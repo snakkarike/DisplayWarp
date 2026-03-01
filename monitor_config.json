@@ -14,6 +14,21 @@
       "force_primary": false,
       "persistent_monitor": false,
       "target_audio_device_id": "{0.0.0.00000000}.{4a38ab22-e8b5-4406-860c-445888613399}"
+    },
+    {
+      "name": "Elin.exe",
+      "exe_path": "G:\\Games\\Elin\\Elin.exe",
+      "target_monitor_name": "\\\\.\\DISPLAY1",
+      "target_monitor_rect": {
+        "left": 0,
+        "top": 0,
+        "right": 2560,
+        "bottom": 1440
+      },
+      "window_process_name": null,
+      "force_primary": false,
+      "persistent_monitor": false,
+      "target_audio_device_id": "{0.0.0.00000000}.{4a38ab22-e8b5-4406-860c-445888613399}"
     }
   ]
 }

@@ -1,3 +1,14 @@
+## v1.0.8
+
+### 🔧 Fixes
+
+- **Profile Creation Crash (Deadlock)**: Fixed a critical bug where manually creating a profile using the standard UI form would result in an immediate application dead-lock and crash (`0xcfffffff`) because the configuration write-to-disk logic re-called a Mutex lock that was already held by the UI thread rendering.
+- **Profile Creation Crash (Array Bounds)**: Fixed a secondary application crash occurring when using the 'Quick Add' profile button from the 'Move Live Window' tab. The code was using an unsafe array lookup (`&app.monitors[...]`) that would panic if a monitor was disconnected or indexed incorrectly.
+- **Audio Output Selection Bug**: Fixed a logic bug across both "Create Profile" audio dropdowns where selecting `Default (System)` would incorrectly display the name of the _first_ physical audio device in your list, rather than the "Default" label.
+- **Log Panel Layout**: The log output container now dynamically expands to occupy the maximum available window height instead of being capped at a hardcoded pixel limit.
+
+---
+
 ## v1.0.7
 
 ### ✨ New Features

@@ -425,14 +425,15 @@ fn draw_edit_profile_form(
                     );
                     ui.add_space(4.0);
 
-                    let audio_text = if app.audio_devices.is_empty() {
-                        "Default (System)".to_string()
-                    } else {
-                        app.audio_devices
-                            .get(app.edit_profile_audio_device_idx.saturating_sub(1))
-                            .map(|d| truncate_text(&d.name, 25))
-                            .unwrap_or_else(|| "Default (System)".to_string())
-                    };
+                    let audio_text =
+                        if app.audio_devices.is_empty() || app.edit_profile_audio_device_idx == 0 {
+                            "Default (System)".to_string()
+                        } else {
+                            app.audio_devices
+                                .get(app.edit_profile_audio_device_idx - 1)
+                                .map(|d| truncate_text(&d.name, 25))
+                                .unwrap_or_else(|| "Default (System)".to_string())
+                        };
 
                     ui.horizontal(|ui| {
                         egui::ComboBox::from_id_salt(format!("edit_audio_{i}"))
@@ -737,14 +738,15 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             );
             ui.add_space(4.0);
 
-            let audio_text = if app.audio_devices.is_empty() {
-                "Default (System)".to_string()
-            } else {
-                app.audio_devices
-                    .get(app.new_profile_audio_device_idx.saturating_sub(1))
-                    .map(|d| truncate_text(&d.name, 25))
-                    .unwrap_or_else(|| "Default (System)".to_string())
-            };
+            let audio_text =
+                if app.audio_devices.is_empty() || app.new_profile_audio_device_idx == 0 {
+                    "Default (System)".to_string()
+                } else {
+                    app.audio_devices
+                        .get(app.new_profile_audio_device_idx - 1)
+                        .map(|d| truncate_text(&d.name, 25))
+                        .unwrap_or_else(|| "Default (System)".to_string())
+                };
 
             ui.horizontal(|ui| {
                 egui::ComboBox::from_id_salt("new_audio_switch")
@@ -795,7 +797,14 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
         .clicked()
     {
         if app.new_profile_exe.is_some() && !app.monitors.is_empty() {
-            let pid_mon = &app.monitors[app.selected_mon_idx];
+            let pid_mon = if let Some(mon) = app.monitors.get(app.selected_mon_idx) {
+                mon
+            } else if let Some(first_mon) = app.monitors.first() {
+                first_mon
+            } else {
+                return;
+            };
+
             let mut data = app.data.lock();
             let proc = app.new_profile_window_process.trim().to_string();
             data.profiles.push(AppProfile {
@@ -823,10 +832,14 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                     None
                 },
             });
+            drop(data);
+
             app.new_profile_exe = None;
             app.new_profile_name.clear();
             app.new_profile_window_process.clear();
+            app.new_profile_audio_device_idx = 0;
             app.save_data();
+            *app.status_message.lock() = "✅ Profile created.".into();
         }
     }
 }
@@ -986,7 +999,13 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
         {
             if let Some(entry) = app.live_processes.get(app.selected_live_process_idx) {
                 if let Some(path) = &entry.exe_path {
-                    let mon = &app.monitors[app.live_move_mon_idx];
+                    let mon = if let Some(m) = app.monitors.get(app.live_move_mon_idx) {
+                        m
+                    } else if let Some(m) = app.monitors.first() {
+                        m
+                    } else {
+                        return;
+                    };
                     let exe = path.clone();
                     app.data.lock().profiles.push(AppProfile {
                         name: exe.file_name().unwrap().to_string_lossy().into_owned(),
