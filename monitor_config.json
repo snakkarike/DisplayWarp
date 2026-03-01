@@ -1,14 +1,14 @@
 {
   "profiles": [
     {
-      "name": "Dispatch.exe",
+      "name": "Dispatch",
       "exe_path": "G:\\Games\\Dispatch\\Dispatch.exe",
-      "target_monitor_name": "\\\\.\\DISPLAY2",
+      "target_monitor_name": "\\\\.\\DISPLAY1",
       "target_monitor_rect": {
-        "left": 2560,
+        "left": 0,
         "top": 0,
-        "right": 4480,
-        "bottom": 1080
+        "right": 2560,
+        "bottom": 1440
       },
       "window_process_name": "Dispatch-Win64-Shipping.exe",
       "force_primary": false,

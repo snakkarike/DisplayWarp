@@ -15,7 +15,7 @@ use crate::window::{
 #[derive(PartialEq, Clone, Copy)]
 pub enum AppTab {
     Warp,
-    Monitors,
+    Display,
     Log,
     Settings,
 }

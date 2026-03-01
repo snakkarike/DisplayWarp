@@ -110,7 +110,7 @@ impl eframe::App for WindowManagerApp {
                     .inner_margin(egui::Margin::same(8))
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new("v1.0.7").small().color(
+                            ui.label(egui::RichText::new("v1.0.7").color(
                                 if self.dark_mode {
                                     egui::Color32::GRAY
                                 } else {
@@ -144,16 +144,16 @@ impl eframe::App for WindowManagerApp {
                     egui::vec2(195.0, 30.0),
                 ));
             }
-            ui.add_space(8.0);
+            ui.add_space(2.0);
 
             // Tab Bar
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut self.current_tab, AppTab::Warp, "Warp");
-                ui.selectable_value(&mut self.current_tab, AppTab::Monitors, "Monitors");
+                ui.selectable_value(&mut self.current_tab, AppTab::Display, "Display");
                 ui.selectable_value(&mut self.current_tab, AppTab::Log, "Log");
                 ui.selectable_value(&mut self.current_tab, AppTab::Settings, "Settings");
             });
-            ui.add_space(8.0);
+            ui.add_space(2.0);
             ui.separator();
             ui.add_space(8.0);
 
@@ -176,7 +176,7 @@ impl eframe::App for WindowManagerApp {
 
                             // 3-Column Grid: Live Mover | New Profile | Saved Profiles
                             ui.columns(3, |cols| {
-                                let col_height = 540.0;
+                                let col_height = 480.0;
 
                                 // Col 1: Move Live Window
                                 cols[0].vertical(|ui| {
@@ -281,7 +281,7 @@ impl eframe::App for WindowManagerApp {
                             });
                         });
                 }
-                AppTab::Monitors => {
+                AppTab::Display => {
                     ui.vertical_centered(|ui| {
                         ui.add_space(100.0);
                         ui.label(
@@ -296,7 +296,6 @@ impl eframe::App for WindowManagerApp {
                         .auto_shrink([false; 2])
                         .id_salt("log_scroll")
                         .show(ui, |ui| {
-                            let col_height = 680.0;
                             egui::Frame::group(ui.style())
                                 .inner_margin(egui::Margin::same(12))
                                 .corner_radius(egui::CornerRadius::same(8))
@@ -315,7 +314,7 @@ impl eframe::App for WindowManagerApp {
                                 ))
                                 .show(ui, |ui| {
                                     ui.set_width(ui.available_width());
-                                    ui.set_min_height(col_height);
+                                    ui.set_min_height(ui.available_height());
                                     ui.label(
                                         egui::RichText::new(format!(
                                             "{} Application Log",
@@ -334,7 +333,6 @@ impl eframe::App for WindowManagerApp {
                         .auto_shrink([false; 2])
                         .id_salt("settings_scroll")
                         .show(ui, |ui| {
-                            ui.add_space(8.0);
                             ui.columns(2, |cols| {
                                 let col_height = 400.0;
                                 // Col 1: Settings
