@@ -1086,3 +1086,356 @@ pub fn draw_status_bar(app: &WindowManagerApp, ui: &mut egui::Ui) {
                 });
         });
 }
+
+// ─── Display Layout Tab ──────────────────────────────────────────────────────
+
+pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
+    if app.monitors.is_empty() {
+        ui.vertical_centered(|ui| {
+            ui.add_space(100.0);
+            ui.label(
+                egui::RichText::new("No monitors detected.")
+                    .size(20.0)
+                    .color(egui::Color32::GRAY),
+            );
+        });
+        return;
+    }
+
+    ui.columns(2, |cols| {
+        // Col 1: Interactive Canvas & Save Form
+        cols[0].vertical(|ui| {
+            ui.set_min_height(500.0);
+            egui::Frame::group(ui.style())
+                .inner_margin(egui::Margin::same(12))
+                .corner_radius(egui::CornerRadius::same(8))
+                .fill(if app.dark_mode {
+                    egui::Color32::from_rgb(25, 25, 25)
+                } else {
+                    egui::Color32::from_rgb(248, 250, 252)
+                })
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    if app.dark_mode {
+                        egui::Color32::from_rgb(44, 44, 44)
+                    } else {
+                        egui::Color32::from_rgb(226, 232, 240)
+                    },
+                ))
+                .show(ui, |ui| {
+                    ui.label(
+                        egui::RichText::new(format!("{} Arrange Monitors", regular::CROP))
+                            .size(16.0)
+                            .strong(),
+                    );
+                    ui.add_space(8.0);
+
+                    // Interactive Dragging Canvas
+                    let (response, painter) = ui.allocate_painter(
+                        egui::vec2(ui.available_width(), 320.0),
+                        egui::Sense::drag(),
+                    );
+                    let rect = response.rect;
+
+                    painter.rect_filled(
+                        rect,
+                        4.0,
+                        if app.dark_mode {
+                            egui::Color32::from_rgb(15, 15, 15)
+                        } else {
+                            egui::Color32::from_rgb(230, 235, 240)
+                        },
+                    );
+
+                    let min_x = app.monitors.iter().map(|m| m.rect.left).min().unwrap_or(0);
+                    let max_x = app.monitors.iter().map(|m| m.rect.right).max().unwrap_or(1);
+                    let min_y = app.monitors.iter().map(|m| m.rect.top).min().unwrap_or(0);
+                    let max_y = app
+                        .monitors
+                        .iter()
+                        .map(|m| m.rect.bottom)
+                        .max()
+                        .unwrap_or(1);
+
+                    let width = (max_x - min_x) as f32;
+                    let height = (max_y - min_y) as f32;
+                    let scale = (rect.width() / width).min(rect.height() / height) * 0.85;
+                    let center = rect.center();
+
+                    // Handle Dragging Logic
+                    if response.drag_started() {
+                        if let Some(pointer_pos) = response.interact_pointer_pos() {
+                            for (i, m) in app.monitors.iter().enumerate() {
+                                let m_rect = egui::Rect::from_min_max(
+                                    center
+                                        + egui::vec2(
+                                            (m.rect.left - min_x) as f32 * scale
+                                                - (width * scale / 2.0),
+                                            (m.rect.top - min_y) as f32 * scale
+                                                - (height * scale / 2.0),
+                                        ),
+                                    center
+                                        + egui::vec2(
+                                            (m.rect.right - min_x) as f32 * scale
+                                                - (width * scale / 2.0),
+                                            (m.rect.bottom - min_y) as f32 * scale
+                                                - (height * scale / 2.0),
+                                        ),
+                                );
+                                if m_rect.contains(pointer_pos) {
+                                    app.dragging_monitor_idx = Some(i);
+                                    app.drag_start_pos = Some(pointer_pos);
+                                    app.original_monitor_rect = Some(m.rect.clone());
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if response.dragged() {
+                        if let (Some(idx), Some(start_pos), Some(orig_rect)) = (
+                            app.dragging_monitor_idx,
+                            app.drag_start_pos,
+                            &app.original_monitor_rect,
+                        ) {
+                            if let Some(current_pos) = response.interact_pointer_pos() {
+                                let delta = current_pos - start_pos;
+                                let delta_virtual_x = (delta.x / scale) as i32;
+                                let delta_virtual_y = (delta.y / scale) as i32;
+
+                                let width = orig_rect.right - orig_rect.left;
+                                let height = orig_rect.bottom - orig_rect.top;
+
+                                app.monitors[idx].rect.left = orig_rect.left + delta_virtual_x;
+                                app.monitors[idx].rect.top = orig_rect.top + delta_virtual_y;
+                                app.monitors[idx].rect.right = app.monitors[idx].rect.left + width;
+                                app.monitors[idx].rect.bottom = app.monitors[idx].rect.top + height;
+
+                                // Snap primary monitor loosely to 0,0 grid if close
+                                if (app.monitors[idx].rect.left).abs() < 50
+                                    && (app.monitors[idx].rect.top).abs() < 50
+                                {
+                                    app.monitors[idx].rect.left = 0;
+                                    app.monitors[idx].rect.top = 0;
+                                    app.monitors[idx].rect.right = width;
+                                    app.monitors[idx].rect.bottom = height;
+                                }
+                            }
+                        }
+                    }
+
+                    if response.drag_stopped() {
+                        app.dragging_monitor_idx = None;
+                        app.drag_start_pos = None;
+                        app.original_monitor_rect = None;
+                    }
+
+                    // Draw Rects
+                    for (i, m) in app.monitors.iter().enumerate() {
+                        let is_primary = m.rect.left == 0 && m.rect.top == 0;
+                        let m_rect = egui::Rect::from_min_max(
+                            center
+                                + egui::vec2(
+                                    (m.rect.left - min_x) as f32 * scale - (width * scale / 2.0),
+                                    (m.rect.top - min_y) as f32 * scale - (height * scale / 2.0),
+                                ),
+                            center
+                                + egui::vec2(
+                                    (m.rect.right - min_x) as f32 * scale - (width * scale / 2.0),
+                                    (m.rect.bottom - min_y) as f32 * scale - (height * scale / 2.0),
+                                ),
+                        );
+
+                        let fill = if is_primary {
+                            if app.dark_mode {
+                                egui::Color32::from_rgb(76, 29, 149)
+                            } else {
+                                egui::Color32::from_rgb(139, 92, 246)
+                            }
+                        } else {
+                            if app.dark_mode {
+                                egui::Color32::from_rgb(30, 41, 59)
+                            } else {
+                                egui::Color32::from_rgb(148, 163, 184)
+                            }
+                        };
+
+                        painter.rect_filled(m_rect, 4.0, fill);
+                        painter.rect_stroke(
+                            m_rect,
+                            egui::CornerRadius::same(4),
+                            egui::Stroke::new(1.5, egui::Color32::from_white_alpha(40)),
+                            egui::StrokeKind::Middle,
+                        );
+
+                        painter.text(
+                            m_rect.center(),
+                            egui::Align2::CENTER_CENTER,
+                            format!("Monitor {}", i + 1).to_owned(),
+                            egui::FontId::proportional(14.0),
+                            egui::Color32::WHITE,
+                        );
+                        painter.text(
+                            m_rect.left_top() + egui::vec2(6.0, 6.0),
+                            egui::Align2::LEFT_TOP,
+                            format!("{}, {}", m.rect.left, m.rect.top).to_owned(),
+                            egui::FontId::proportional(10.0),
+                            egui::Color32::from_white_alpha(150),
+                        );
+                    }
+
+                    ui.add_space(12.0);
+                    ui.separator();
+                    ui.add_space(8.0);
+
+                    // Save Form
+                    ui.label(egui::RichText::new("Save Layout").strong());
+                    ui.horizontal(|ui| {
+                        ui.add(
+                            egui::TextEdit::singleline(&mut app.new_display_profile_name)
+                                .hint_text("Layout Name...")
+                                .desired_width(ui.available_width() - 100.0),
+                        );
+                        if ui
+                            .add_sized(
+                                [90.0, 24.0],
+                                egui::Button::new(format!("{} Save", regular::FLOPPY_DISK)),
+                            )
+                            .clicked()
+                        {
+                            if !app.new_display_profile_name.is_empty() {
+                                let monitors_snapshot = app
+                                    .monitors
+                                    .iter()
+                                    .map(|m| crate::models::SavedMonitorPos {
+                                        device_name: m.device_name.clone(),
+                                        rect: crate::models::SerializableRect {
+                                            left: m.rect.left,
+                                            top: m.rect.top,
+                                            right: m.rect.right,
+                                            bottom: m.rect.bottom,
+                                        },
+                                    })
+                                    .collect();
+
+                                app.data.lock().display_profiles.push(
+                                    crate::models::SavedDisplayLayout {
+                                        name: app.new_display_profile_name.clone(),
+                                        monitors: monitors_snapshot,
+                                    },
+                                );
+                                app.new_display_profile_name.clear();
+                                app.save_data();
+                                WindowManagerApp::push_status(
+                                    &app.status_message,
+                                    &app.status_log,
+                                    "✅ Display layout saved.",
+                                );
+                            }
+                        }
+                    });
+                });
+        });
+
+        // Col 2: Saved Display Profiles List
+        cols[1].vertical(|ui| {
+            ui.set_min_height(500.0);
+            egui::Frame::group(ui.style())
+                .inner_margin(egui::Margin::same(12))
+                .corner_radius(egui::CornerRadius::same(8))
+                .fill(if app.dark_mode {
+                    egui::Color32::from_rgb(25, 25, 25)
+                } else {
+                    egui::Color32::from_rgb(248, 250, 252)
+                })
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    if app.dark_mode {
+                        egui::Color32::from_rgb(44, 44, 44)
+                    } else {
+                        egui::Color32::from_rgb(226, 232, 240)
+                    },
+                ))
+                .show(ui, |ui| {
+                    ui.label(
+                        egui::RichText::new(format!("{} Saved Profiles", regular::BOOKMARK_SIMPLE))
+                            .size(16.0)
+                            .strong(),
+                    );
+                    ui.add_space(8.0);
+
+                    let mut to_remove = None;
+                    let display_profiles = app.data.lock().display_profiles.clone();
+
+                    if display_profiles.is_empty() {
+                        ui.label(
+                            egui::RichText::new("No display profiles saved.")
+                                .color(egui::Color32::GRAY),
+                        );
+                    }
+
+                    egui::ScrollArea::vertical()
+                        .id_salt("display_profiles_scroll")
+                        .show(ui, |ui| {
+                            for (i, p) in display_profiles.iter().enumerate() {
+                                egui::Frame::group(ui.style())
+                                    .inner_margin(egui::Margin::same(8))
+                                    .corner_radius(egui::CornerRadius::same(6))
+                                    .fill(if app.dark_mode {
+                                        egui::Color32::from_rgb(34, 34, 34)
+                                    } else {
+                                        egui::Color32::from_rgb(241, 245, 249)
+                                    })
+                                    .stroke(egui::Stroke::new(
+                                        1.0,
+                                        if app.dark_mode {
+                                            egui::Color32::from_rgb(50, 50, 50)
+                                        } else {
+                                            egui::Color32::from_rgb(226, 232, 240)
+                                        },
+                                    ))
+                                    .show(ui, |ui| {
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new(&p.name).strong());
+                                            ui.with_layout(
+                                                egui::Layout::right_to_left(egui::Align::Center),
+                                                |ui| {
+                                                    if ui
+                                                        .button(format!("{} Apply", regular::PLAY))
+                                                        .clicked()
+                                                    {
+                                                        crate::monitor::restore_monitor_layout(
+                                                            &p.monitors,
+                                                        );
+                                                        WindowManagerApp::push_status(
+                                                            &app.status_message,
+                                                            &app.status_log,
+                                                            format!("✅ Applied '{}'", p.name),
+                                                        );
+                                                        app.refresh_monitors();
+                                                    }
+                                                    if ui
+                                                        .button(format!(
+                                                            "{} Delete",
+                                                            regular::TRASH
+                                                        ))
+                                                        .clicked()
+                                                    {
+                                                        to_remove = Some(i);
+                                                    }
+                                                },
+                                            );
+                                        });
+                                    });
+                                ui.add_space(4.0);
+                            }
+                        });
+
+                    if let Some(idx) = to_remove {
+                        app.data.lock().display_profiles.remove(idx);
+                        app.save_data();
+                    }
+                });
+        });
+    });
+}

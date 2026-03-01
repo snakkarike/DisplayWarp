@@ -259,14 +259,12 @@ impl eframe::App for WindowManagerApp {
                         });
                 }
                 AppTab::Display => {
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(100.0);
-                        ui.label(
-                            egui::RichText::new("Coming Soon")
-                                .size(24.0)
-                                .color(egui::Color32::GRAY),
-                        );
-                    });
+                    egui::ScrollArea::vertical()
+                        .auto_shrink([false; 2])
+                        .id_salt("display_scroll")
+                        .show(ui, |ui| {
+                            panels::draw_display_tab(self, ui);
+                        });
                 }
                 AppTab::Log => {
                     egui::ScrollArea::vertical()

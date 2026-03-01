@@ -51,6 +51,14 @@ pub struct SavedData {
     pub start_on_boot: bool,
     #[serde(default = "default_watcher_interval")]
     pub watcher_interval_secs: u64,
+    #[serde(default)]
+    pub display_profiles: Vec<SavedDisplayLayout>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct SavedDisplayLayout {
+    pub name: String,
+    pub monitors: Vec<SavedMonitorPos>,
 }
 
 impl Default for SavedData {
@@ -61,6 +69,7 @@ impl Default for SavedData {
             start_minimized: false,
             start_on_boot: false,
             watcher_interval_secs: 3,
+            display_profiles: vec![],
         }
     }
 }
@@ -77,9 +86,9 @@ pub struct MonitorInfo {
     pub device_name: String,
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[allow(dead_code)]
 pub struct SavedMonitorPos {
     pub device_name: String,
-    pub rect: RECT,
+    pub rect: SerializableRect,
 }

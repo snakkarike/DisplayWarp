@@ -1,3 +1,4 @@
+use eframe::egui;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use windows::Win32::Foundation::{HWND, RECT};
@@ -41,6 +42,12 @@ pub struct WindowManagerApp {
     pub live_processes: Vec<ProcessEntry>,
     pub selected_live_process_idx: usize,
     pub live_move_mon_idx: usize,
+    // ── Display Profile state ──
+    pub new_display_profile_name: String,
+    pub dragging_monitor_idx: Option<usize>,
+    pub drag_start_pos: Option<egui::Pos2>,
+    pub original_monitor_rect: Option<windows::Win32::Foundation::RECT>,
+
     // ── Persistent monitor watcher ──
     pub watcher_running: Arc<AtomicBool>,
     // ── System tray ──
@@ -83,6 +90,11 @@ impl Default for WindowManagerApp {
             live_processes: vec![],
             selected_live_process_idx: 0,
             live_move_mon_idx: 0,
+            new_display_profile_name: String::new(),
+            dragging_monitor_idx: None,
+            drag_start_pos: None,
+            original_monitor_rect: None,
+
             watcher_running: Arc::clone(&watcher_running),
             tray: None,
 

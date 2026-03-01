@@ -34,5 +34,71 @@
   "close_to_tray": false,
   "start_minimized": false,
   "start_on_boot": false,
-  "watcher_interval_secs": 3
+  "watcher_interval_secs": 3,
+  "display_profiles": [
+    {
+      "name": "Default",
+      "monitors": [
+        {
+          "device_name": "\\\\.\\DISPLAY1",
+          "rect": {
+            "left": 0,
+            "top": 0,
+            "right": 2560,
+            "bottom": 1440
+          }
+        },
+        {
+          "device_name": "\\\\.\\DISPLAY2",
+          "rect": {
+            "left": 2560,
+            "top": 0,
+            "right": 4480,
+            "bottom": 1080
+          }
+        },
+        {
+          "device_name": "\\\\.\\DISPLAY3",
+          "rect": {
+            "left": -3840,
+            "top": 0,
+            "right": 0,
+            "bottom": 2160
+          }
+        }
+      ]
+    },
+    {
+      "name": "Test",
+      "monitors": [
+        {
+          "device_name": "\\\\.\\DISPLAY1",
+          "rect": {
+            "left": 0,
+            "top": 0,
+            "right": 2560,
+            "bottom": 1440
+          }
+        },
+        {
+          "device_name": "\\\\.\\DISPLAY2",
+          "rect": {
+            "left": 12,
+            "top": 1449,
+            "right": 1932,
+            "bottom": 2529
+          }
+        },
+        {
+          "device_name": "\\\\.\\DISPLAY3",
+          "rect": {
+            "left": -3840,
+            "top": 0,
+            "right": 0,
+            "bottom": 2160
+          }
+        }
+      ]
+    }
+  ]
 }
