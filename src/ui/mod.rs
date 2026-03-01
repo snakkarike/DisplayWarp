@@ -504,10 +504,69 @@ pub fn draw_monitor_preview(
         ))
         .show(ui, |ui| {
             let (rect, _) = ui.allocate_at_least(
-                egui::vec2(ui.available_width(), 160.0),
+                egui::vec2(ui.available_width(), 220.0),
                 egui::Sense::hover(),
             );
             let painter = ui.painter_at(rect);
+
+            // Draw background grid with fadeout at edges
+            let step = 20.0;
+            let fade_margin = 60.0;
+            let max_alpha = 18.0;
+            
+            // Vertical lines
+            let mut x = rect.left() - (rect.left() % step);
+            while x < rect.right() {
+                if x >= rect.left() {
+                    let fade_x = ((x - rect.left()).min(rect.right() - x) / fade_margin).clamp(0.0, 1.0);
+                    if fade_x > 0.0 {
+                        let mut y = rect.top();
+                        while y < rect.bottom() {
+                            let next_y = (y + 10.0).min(rect.bottom());
+                            let fade_y1 = ((y - rect.top()).min(rect.bottom() - y) / fade_margin).clamp(0.0, 1.0);
+                            let fade_y2 = ((next_y - rect.top()).min(rect.bottom() - next_y) / fade_margin).clamp(0.0, 1.0);
+                            let alpha = (fade_x * (fade_y1 + fade_y2) * 0.5 * max_alpha) as u8;
+                            if alpha > 0 {
+                                let color = if app.dark_mode {
+                                    egui::Color32::from_white_alpha(alpha)
+                                } else {
+                                    egui::Color32::from_black_alpha(alpha)
+                                };
+                                painter.line_segment([egui::pos2(x, y), egui::pos2(x, next_y)], egui::Stroke::new(1.0, color));
+                            }
+                            y = next_y;
+                        }
+                    }
+                }
+                x += step;
+            }
+            
+            // Horizontal lines
+            let mut y = rect.top() - (rect.top() % step);
+            while y < rect.bottom() {
+                if y >= rect.top() {
+                    let fade_y = ((y - rect.top()).min(rect.bottom() - y) / fade_margin).clamp(0.0, 1.0);
+                    if fade_y > 0.0 {
+                        let mut x = rect.left();
+                        while x < rect.right() {
+                            let next_x = (x + 10.0).min(rect.right());
+                            let fade_x1 = ((x - rect.left()).min(rect.right() - x) / fade_margin).clamp(0.0, 1.0);
+                            let fade_x2 = ((next_x - rect.left()).min(rect.right() - next_x) / fade_margin).clamp(0.0, 1.0);
+                            let alpha = (fade_y * (fade_x1 + fade_x2) * 0.5 * max_alpha) as u8;
+                            if alpha > 0 {
+                                let color = if app.dark_mode {
+                                    egui::Color32::from_white_alpha(alpha)
+                                } else {
+                                    egui::Color32::from_black_alpha(alpha)
+                                };
+                                painter.line_segment([egui::pos2(x, y), egui::pos2(next_x, y)], egui::Stroke::new(1.0, color));
+                            }
+                            x = next_x;
+                        }
+                    }
+                }
+                y += step;
+            }
 
             if app.monitors.is_empty() {
                 painter.text(
@@ -586,6 +645,19 @@ pub fn draw_monitor_preview(
 
                     let w = m.rect.right - m.rect.left;
                     let h = m.rect.bottom - m.rect.top;
+
+                    // Top Left: Coordinates
+                    painter.text(
+                        m_rect.min + egui::vec2(6.0, 6.0),
+                        egui::Align2::LEFT_TOP,
+                        format!("{}, {}", m.rect.left, m.rect.top),
+                        egui::FontId::proportional(10.0),
+                        if app.dark_mode {
+                            egui::Color32::from_white_alpha(140)
+                        } else {
+                            egui::Color32::from_black_alpha(140)
+                        },
+                    );
 
                     // Center: "Resolution" label
                     painter.text(
