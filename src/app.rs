@@ -12,10 +12,20 @@ use crate::window::{
 
 // ─── Application State ───────────────────────────────────────────────────────
 
+#[derive(PartialEq, Clone, Copy)]
+pub enum AppTab {
+    Warp,
+    Monitors,
+    Log,
+    Settings,
+}
+
 pub struct WindowManagerApp {
     pub monitors: Vec<MonitorInfo>,
     /// Shared so the background watcher can read profiles.
     pub data: Arc<parking_lot::Mutex<SavedData>>,
+    // ── Navigation ──
+    pub current_tab: AppTab,
     // ── New profile form state ──
     pub new_profile_name: String,
     pub new_profile_exe: Option<std::path::PathBuf>,
@@ -46,6 +56,8 @@ pub struct WindowManagerApp {
     // ── Shared ──
     pub status_message: Arc<parking_lot::Mutex<String>>,
     pub status_log: Arc<parking_lot::Mutex<Vec<String>>>,
+    pub changelog: Arc<parking_lot::Mutex<String>>,
+    pub markdown_cache: egui_commonmark::CommonMarkCache,
     // ── Theme ──
     pub dark_mode: bool,
 }
@@ -58,6 +70,7 @@ impl Default for WindowManagerApp {
         let mut app = Self {
             monitors: vec![],
             data: Arc::clone(&data),
+            current_tab: AppTab::Warp,
             new_profile_name: String::new(),
             new_profile_exe: None,
             selected_mon_idx: 0,
@@ -79,6 +92,10 @@ impl Default for WindowManagerApp {
             edit_profile_audio_device_idx: 0,
             status_message: Arc::new(parking_lot::Mutex::new(String::from("Ready."))),
             status_log: Arc::new(parking_lot::Mutex::new(vec!["Ready.".to_string()])),
+            changelog: Arc::new(parking_lot::Mutex::new(String::from(
+                "Loading changelog...",
+            ))),
+            markdown_cache: egui_commonmark::CommonMarkCache::default(),
             dark_mode: true,
         };
         app.refresh_monitors();
@@ -88,6 +105,7 @@ impl Default for WindowManagerApp {
 
         // Start the background watcher thread.
         Self::start_watcher(Arc::clone(&data), Arc::clone(&watcher_running));
+        Self::fetch_changelog(Arc::clone(&app.changelog));
 
         app
     }
@@ -96,6 +114,31 @@ impl Default for WindowManagerApp {
 // ─── Core Logic ──────────────────────────────────────────────────────────────
 
 impl WindowManagerApp {
+    fn fetch_changelog(changelog: Arc<parking_lot::Mutex<String>>) {
+        std::thread::spawn(move || {
+            let res =
+                ureq::get("https://api.github.com/repos/snakkarike/DisplayWarp/releases/latest")
+                    .set("User-Agent", "DisplayWarp")
+                    .call();
+
+            match res {
+                Ok(response) => {
+                    if let Ok(json) = response.into_json::<serde_json::Value>() {
+                        if let Some(body) = json.get("body").and_then(|b| b.as_str()) {
+                            *changelog.lock() = body.to_string();
+                        } else {
+                            *changelog.lock() = "No changelog found in latest release.".to_string();
+                        }
+                    } else {
+                        *changelog.lock() = "Failed to parse GitHub response.".to_string();
+                    }
+                }
+                Err(e) => {
+                    *changelog.lock() = format!("Failed to fetch changelog: {}", e);
+                }
+            }
+        });
+    }
     /// Set the status message and append to the log history.
     pub fn push_status(
         status: &Arc<parking_lot::Mutex<String>>,

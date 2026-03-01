@@ -47,6 +47,9 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_System_Com_StructuredStorage",
     "Win32_System_Variant",
 ] }
+ureq = { version = "2", features = ["json"] }
+egui_commonmark = "0.22.0"
+egui_extras = { version = "0.30", features = ["svg", "image"] }
 
 [profile.release]
 opt-level = "z"   # optimize for size
