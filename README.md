@@ -1,6 +1,6 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/DisplayWarpLogo.png">
-  <img alt="DisplayWarp" src="assets/DisplayWarpLogoDark.png">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/DisplayWarpLogoWhite.png">
+  <img alt="DisplayWarp" src="assets/DisplayWarpLogoBlack.png">
 </picture>
 
 #### Launch any application on any monitor, every time. Move live windows instantly.
