@@ -76,7 +76,8 @@ impl eframe::App for WindowManagerApp {
                     .inner_margin(egui::Margin::same(8))
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new(format!("v{}", env!("CARGO_PKG_VERSION"))).color(
+                            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                                ui.label(egui::RichText::new(format!("v{}", env!("CARGO_PKG_VERSION"))).color(
                                 if self.dark_mode {
                                     egui::Color32::GRAY
                                 } else {
@@ -98,26 +99,36 @@ impl eframe::App for WindowManagerApp {
                                 },
                             );
                         });
+                        });
                     });
             });
 
         // ── Central: everything else ─────────────────────────────────────
         egui::CentralPanel::default().show(ctx, |ui| {
-            // Header: Logo
-            if let Some(tex) = &self.logo_texture {
-                ui.image(egui::load::SizedTexture::new(
-                    tex.id(),
-                    egui::vec2(195.0, 30.0),
-                ));
-            }
             ui.add_space(2.0);
 
-            // Tab Bar
+            // Tab Bar with Logo
             ui.horizontal(|ui| {
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                    let logo_option = if self.dark_mode {
+                    &self.logo_texture_white
+                } else {
+                    &self.logo_texture
+                };
+                
+                if let Some(tex) = logo_option {
+                    ui.image(egui::load::SizedTexture::new(
+                        tex.id(),
+                        egui::vec2(146.0, 22.0), // Scaled down slightly to fit inline natively
+                    ));
+                    ui.add_space(8.0);
+                }
+                
                 ui.selectable_value(&mut self.current_tab, AppTab::Warp, "Warp");
                 ui.selectable_value(&mut self.current_tab, AppTab::Display, "Display");
                 ui.selectable_value(&mut self.current_tab, AppTab::Log, "Log");
                 ui.selectable_value(&mut self.current_tab, AppTab::Settings, "Settings");
+                });
             });
             ui.add_space(2.0);
             ui.separator();
@@ -333,64 +344,103 @@ impl eframe::App for WindowManagerApp {
                                             );
                                             ui.add_space(16.0);
 
-                                            ui.horizontal(|ui| {
-                                                ui.label("Theme:");
-                                                let theme_icon = if self.dark_mode {
-                                                    regular::SUN
-                                                } else {
-                                                    regular::MOON
-                                                };
-                                                if ui.button(format!("{} Toggle Theme", theme_icon)).clicked() {
-                                                    self.dark_mode = !self.dark_mode;
-                                                }
-                                            });
+
+                                            // Theme Card
+                                            egui::Frame::group(ui.style())
+                                                .inner_margin(egui::Margin::same(12))
+                                                .corner_radius(egui::CornerRadius::same(8))
+                                                .fill(if self.dark_mode { egui::Color32::from_rgb(34, 34, 34) } else { egui::Color32::from_rgb(241, 245, 249) })
+                                                .stroke(egui::Stroke::new(1.0, if self.dark_mode { egui::Color32::from_rgb(44, 44, 44) } else { egui::Color32::from_rgb(226, 232, 240) }))
+                                                .show(ui, |ui| {
+                                                    ui.set_width(ui.available_width());
+                                                    ui.horizontal(|ui| {
+                                                        ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                                                            ui.label(egui::RichText::new("Theme:").strong());
+                                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                            let theme_icon = if self.dark_mode { regular::SUN } else { regular::MOON };
+                                                            if ui.button(format!("{} Toggle Theme", theme_icon)).clicked() {
+                                                                self.dark_mode = !self.dark_mode;
+                                                            }
+                                                        });
+                                                        });
+                                                    });
+                                                });
 
                                             ui.add_space(8.0);
-                                            ui.separator();
+
+                                            // Behavior Card
+                                            egui::Frame::group(ui.style())
+                                                .inner_margin(egui::Margin::same(12))
+                                                .corner_radius(egui::CornerRadius::same(8))
+                                                .fill(if self.dark_mode { egui::Color32::from_rgb(34, 34, 34) } else { egui::Color32::from_rgb(241, 245, 249) })
+                                                .stroke(egui::Stroke::new(1.0, if self.dark_mode { egui::Color32::from_rgb(44, 44, 44) } else { egui::Color32::from_rgb(226, 232, 240) }))
+                                                .show(ui, |ui| {
+                                                    ui.set_width(ui.available_width());
+                                                    ui.label(egui::RichText::new("Application Behavior").strong());
+                                                    ui.add_space(8.0);
+
+                                                    let mut data = self.data.lock();
+                                                    let mut dirty = false;
+
+                                                    if ui.checkbox(&mut data.close_to_tray, "Minimize to tray on close").clicked() {
+                                                        dirty = true;
+                                                    }
+
+                                                    ui.add_space(4.0);
+                                                    if ui.checkbox(&mut data.start_minimized, "Start minimized to tray").clicked() {
+                                                        dirty = true;
+                                                    }
+
+                                                    ui.add_space(4.0);
+                                                    if ui.checkbox(&mut data.start_on_boot, "Start on system startup").clicked() {
+                                                        dirty = true;
+                                                        let al = WindowManagerApp::get_auto_launch();
+                                                        if data.start_on_boot {
+                                                            let _ = al.enable();
+                                                        } else {
+                                                            let _ = al.disable();
+                                                        }
+                                                    }
+
+                                                    if dirty {
+                                                        drop(data);
+                                                        self.save_data();
+                                                    }
+                                                });
+
                                             ui.add_space(8.0);
-                                            ui.label(egui::RichText::new("Application Behavior").strong());
-                                            ui.add_space(4.0);
 
-                                            let mut data = self.data.lock();
-                                            let mut dirty = false;
+                                            // Watcher Interval Card
+                                            egui::Frame::group(ui.style())
+                                                .inner_margin(egui::Margin::same(12))
+                                                .corner_radius(egui::CornerRadius::same(8))
+                                                .fill(if self.dark_mode { egui::Color32::from_rgb(34, 34, 34) } else { egui::Color32::from_rgb(241, 245, 249) })
+                                                .stroke(egui::Stroke::new(1.0, if self.dark_mode { egui::Color32::from_rgb(44, 44, 44) } else { egui::Color32::from_rgb(226, 232, 240) }))
+                                                .show(ui, |ui| {
+                                                    ui.set_width(ui.available_width());
+                                                    ui.label(egui::RichText::new("Background Watcher Interval").strong());
+                                                    ui.add_space(4.0);
 
-                                            if ui.checkbox(&mut data.close_to_tray, "Minimize to tray on close").clicked() {
-                                                dirty = true;
-                                            }
+                                                    let mut data = self.data.lock();
+                                                    let mut dirty = false;
+                                                    let mut interval = data.watcher_interval_secs;
+                                                    if ui.add(egui::Slider::new(&mut interval, 1..=30).suffix(" seconds")).changed() {
+                                                        data.watcher_interval_secs = interval;
+                                                        dirty = true;
+                                                    }
 
-                                            if ui.checkbox(&mut data.start_minimized, "Start minimized to tray").clicked() {
-                                                dirty = true;
-                                            }
-
-                                            if ui.checkbox(&mut data.start_on_boot, "Start on system startup").clicked() {
-                                                dirty = true;
-                                                let al = WindowManagerApp::get_auto_launch();
-                                                if data.start_on_boot {
-                                                    let _ = al.enable();
-                                                } else {
-                                                    let _ = al.disable();
-                                                }
-                                            }
-
-                                            ui.add_space(8.0);
-                                            ui.label("Background Watcher Interval:");
-                                            
-                                            let mut interval = data.watcher_interval_secs;
-                                            if ui.add(egui::Slider::new(&mut interval, 1..=30).suffix(" seconds")).changed() {
-                                                data.watcher_interval_secs = interval;
-                                                dirty = true;
-                                            }
-                                            
-                                            ui.label(
-                                                egui::RichText::new("Controls how often DisplayWarp scans application placement to enforce persistence rules. Lower speeds save CPU.")
-                                                    .size(11.0)
-                                                    .color(egui::Color32::from_gray(140))
-                                            );
-
-                                            if dirty {
-                                                drop(data);
-                                                self.save_data();
-                                            }
+                                                    if dirty {
+                                                        drop(data);
+                                                        self.save_data();
+                                                    }
+                                                    
+                                                    ui.add_space(6.0);
+                                                    ui.label(
+                                                        egui::RichText::new("Controls how often DisplayWarp scans application placement to enforce persistence rules. Lower speeds save CPU.")
+                                                            .size(11.0)
+                                                            .color(egui::Color32::from_gray(140))
+                                                    );
+                                                });
                                         });
                                 });
 
@@ -416,16 +466,6 @@ impl eframe::App for WindowManagerApp {
                                         .show(ui, |ui| {
                                             ui.set_width(ui.available_width());
                                             ui.set_min_height(ui.available_height());
-                                            
-                                            // Logo if available
-                                            if let Some(tex) = &self.logo_texture {
-                                                ui.image(egui::load::SizedTexture::new(
-                                                    tex.id(),
-                                                    egui::vec2(195.0, 30.0),
-                                                ));
-                                                ui.add_space(8.0);
-                                            }
-
                                             ui.label(
                                                 egui::RichText::new(format!(
                                                     "{} About DisplayWarp",

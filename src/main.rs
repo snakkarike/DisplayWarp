@@ -46,8 +46,8 @@ fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_visible(start_visible)
-            .with_inner_size([980.0, 940.0])
-            .with_min_inner_size([960.0, 900.0])
+            .with_inner_size([980.0, 920.0])
+            .with_min_inner_size([960.0, 920.0])
             .with_icon(std::sync::Arc::new(icon)),
         ..Default::default()
     };
@@ -76,6 +76,34 @@ fn main() -> eframe::Result {
             cc.egui_ctx.set_fonts(fonts);
 
             let mut app = app::WindowManagerApp::default();
+
+            // Load Application Header Logos
+            let load_tex = |bytes: &[u8], name: &str| -> Option<egui::TextureHandle> {
+                if let Ok(img) = image::load_from_memory(bytes) {
+                    let rgba = img.to_rgba8();
+                    let pixels = rgba.as_flat_samples();
+                    let color_image = egui::ColorImage::from_rgba_unmultiplied(
+                        [img.width() as _, img.height() as _],
+                        pixels.as_slice(),
+                    );
+                    Some(
+                        cc.egui_ctx
+                            .load_texture(name, color_image, egui::TextureOptions::LINEAR),
+                    )
+                } else {
+                    None
+                }
+            };
+
+            app.logo_texture = load_tex(
+                include_bytes!("../assets/DisplayWarpLogoBlack.png"),
+                "logo-dark",
+            );
+            app.logo_texture_white = load_tex(
+                include_bytes!("../assets/DisplayWarpLogoWhite.png"),
+                "logo-light",
+            );
+
             let tray_items = tray::create_tray(app.watcher_running.clone());
             app.tray = Some(tray_items);
             Ok(Box::new(app))

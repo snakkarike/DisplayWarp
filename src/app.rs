@@ -47,6 +47,7 @@ pub struct WindowManagerApp {
     pub tray: Option<crate::tray::TrayItems>,
     // ── Logo texture ──
     pub logo_texture: Option<eframe::egui::TextureHandle>,
+    pub logo_texture_white: Option<eframe::egui::TextureHandle>,
     // ── Audio state ──
     pub audio_devices: Vec<crate::audio::AudioDeviceInfo>,
     pub new_profile_audio_device_idx: usize,
@@ -86,6 +87,7 @@ impl Default for WindowManagerApp {
             tray: None,
 
             logo_texture: None,
+            logo_texture_white: None,
             audio_devices: vec![],
             new_profile_audio_device_idx: 0,
             edit_profile_audio_device_idx: 0,
