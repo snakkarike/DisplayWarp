@@ -1,5 +1,5 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/DisplayWarpLogoDark.png">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/DisplayWarpLogo.png">
   <img alt="DisplayWarp" src="assets/DisplayWarpLogo.png">
 </picture>
 
