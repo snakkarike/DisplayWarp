@@ -16,11 +16,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::BOOL;
 
-use serde::{Deserialize, Serialize};
-
 // ─── Public types ─────────────────────────────────────────────────────────────
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone)]
 pub struct ProcessEntry {
     pub hwnd: HWND,
     #[allow(dead_code)]
