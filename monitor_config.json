@@ -3,16 +3,17 @@
     {
       "name": "Dispatch.exe",
       "exe_path": "G:\\Games\\Dispatch\\Dispatch.exe",
-      "target_monitor_name": "\\\\.\\DISPLAY3",
+      "target_monitor_name": "\\\\.\\DISPLAY2",
       "target_monitor_rect": {
-        "left": -3840,
+        "left": 2560,
         "top": 0,
-        "right": 0,
-        "bottom": 2160
+        "right": 4480,
+        "bottom": 1080
       },
-      "window_process_name": null,
+      "window_process_name": "Dispatch-Win64-Shipping.exe",
       "force_primary": false,
-      "persistent_monitor": false
+      "persistent_monitor": false,
+      "target_audio_device_id": "{0.0.0.00000000}.{4a38ab22-e8b5-4406-860c-445888613399}"
     }
   ]
 }

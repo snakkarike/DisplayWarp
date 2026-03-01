@@ -6,16 +6,26 @@ use windows::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromWindow}
 use crate::models::{AppProfile, MonitorInfo, SavedData};
 use crate::monitor::get_all_monitors;
 use crate::window::{
-    ProcessEntry, find_window_by_process_name, list_visible_windows, move_to_monitor,
-    move_window_once, wait_for_window, wait_for_window_by_name,
+    ProcessEntry, find_window_by_process_name, list_visible_windows, move_window_once,
+    wait_for_window, wait_for_window_by_name,
 };
 
 // ─── Application State ───────────────────────────────────────────────────────
+
+#[derive(PartialEq, Clone, Copy)]
+pub enum AppTab {
+    Warp,
+    Monitors,
+    Log,
+    Settings,
+}
 
 pub struct WindowManagerApp {
     pub monitors: Vec<MonitorInfo>,
     /// Shared so the background watcher can read profiles.
     pub data: Arc<parking_lot::Mutex<SavedData>>,
+    // ── Navigation ──
+    pub current_tab: AppTab,
     // ── New profile form state ──
     pub new_profile_name: String,
     pub new_profile_exe: Option<std::path::PathBuf>,
@@ -39,8 +49,15 @@ pub struct WindowManagerApp {
     pub show_close_dialog: bool,
     // ── Logo texture ──
     pub logo_texture: Option<eframe::egui::TextureHandle>,
+    // ── Audio state ──
+    pub audio_devices: Vec<crate::audio::AudioDeviceInfo>,
+    pub new_profile_audio_device_idx: usize,
+    pub edit_profile_audio_device_idx: usize,
     // ── Shared ──
     pub status_message: Arc<parking_lot::Mutex<String>>,
+    pub status_log: Arc<parking_lot::Mutex<Vec<String>>>,
+    pub changelog: Arc<parking_lot::Mutex<String>>,
+    pub markdown_cache: egui_commonmark::CommonMarkCache,
     // ── Theme ──
     pub dark_mode: bool,
 }
@@ -53,6 +70,7 @@ impl Default for WindowManagerApp {
         let mut app = Self {
             monitors: vec![],
             data: Arc::clone(&data),
+            current_tab: AppTab::Warp,
             new_profile_name: String::new(),
             new_profile_exe: None,
             selected_mon_idx: 0,
@@ -69,15 +87,25 @@ impl Default for WindowManagerApp {
             tray: None,
             show_close_dialog: false,
             logo_texture: None,
+            audio_devices: vec![],
+            new_profile_audio_device_idx: 0,
+            edit_profile_audio_device_idx: 0,
             status_message: Arc::new(parking_lot::Mutex::new(String::from("Ready."))),
+            status_log: Arc::new(parking_lot::Mutex::new(vec!["Ready.".to_string()])),
+            changelog: Arc::new(parking_lot::Mutex::new(String::from(
+                "Loading changelog...",
+            ))),
+            markdown_cache: egui_commonmark::CommonMarkCache::default(),
             dark_mode: true,
         };
         app.refresh_monitors();
+        app.refresh_audio_devices();
         app.refresh_live_processes();
         app.load_data();
 
         // Start the background watcher thread.
         Self::start_watcher(Arc::clone(&data), Arc::clone(&watcher_running));
+        Self::fetch_changelog(Arc::clone(&app.changelog));
 
         app
     }
@@ -86,6 +114,46 @@ impl Default for WindowManagerApp {
 // ─── Core Logic ──────────────────────────────────────────────────────────────
 
 impl WindowManagerApp {
+    fn fetch_changelog(changelog: Arc<parking_lot::Mutex<String>>) {
+        std::thread::spawn(move || {
+            let res =
+                ureq::get("https://api.github.com/repos/snakkarike/DisplayWarp/releases/latest")
+                    .set("User-Agent", "DisplayWarp")
+                    .call();
+
+            match res {
+                Ok(response) => {
+                    if let Ok(json) = response.into_json::<serde_json::Value>() {
+                        if let Some(body) = json.get("body").and_then(|b| b.as_str()) {
+                            *changelog.lock() = body.to_string();
+                        } else {
+                            *changelog.lock() = "No changelog found in latest release.".to_string();
+                        }
+                    } else {
+                        *changelog.lock() = "Failed to parse GitHub response.".to_string();
+                    }
+                }
+                Err(e) => {
+                    *changelog.lock() = format!("Failed to fetch changelog: {}", e);
+                }
+            }
+        });
+    }
+    /// Set the status message and append to the log history.
+    pub fn push_status(
+        status: &Arc<parking_lot::Mutex<String>>,
+        log: &Arc<parking_lot::Mutex<Vec<String>>>,
+        msg: impl Into<String>,
+    ) {
+        let msg = msg.into();
+        *status.lock() = msg.clone();
+        let mut l = log.lock();
+        l.push(msg);
+        if l.len() > 200 {
+            l.remove(0);
+        }
+    }
+
     pub fn refresh_monitors(&mut self) {
         self.monitors = get_all_monitors();
         let max = self.monitors.len().saturating_sub(1);
@@ -97,6 +165,12 @@ impl WindowManagerApp {
     pub fn refresh_live_processes(&mut self) {
         self.live_processes = list_visible_windows();
         self.selected_live_process_idx = 0;
+    }
+
+    pub fn refresh_audio_devices(&mut self) {
+        if let Ok(devices) = crate::audio::get_audio_output_devices() {
+            self.audio_devices = devices;
+        }
     }
 
     pub fn load_data(&mut self) {
@@ -124,9 +198,6 @@ impl WindowManagerApp {
 
     // ─── Background watcher ──────────────────────────────────────────────
 
-    /// Spawn a background thread that every 3 seconds checks each profile with
-    /// `persistent_monitor == true`. If the profiled window is on the wrong
-    /// monitor, it moves it.
     fn start_watcher(data: Arc<parking_lot::Mutex<SavedData>>, running: Arc<AtomicBool>) {
         std::thread::spawn(move || {
             while running.load(Ordering::Relaxed) {
@@ -144,16 +215,15 @@ impl WindowManagerApp {
                     }
                     let proc_name = match &profile.window_process_name {
                         Some(name) if !name.is_empty() => name.to_lowercase(),
-                        _ => continue, // need a process name to match
+                        _ => continue,
                     };
 
-                    // Try to find the window.
+                    // find_window_by_process_name returns Option<HWND> — fine for watcher
                     let hwnd = match find_window_by_process_name(&proc_name) {
                         Some(h) => h,
-                        None => continue, // not running
+                        None => continue,
                     };
 
-                    // Find the target monitor rect.
                     let target_rect =
                         Self::find_monitor_rect(&monitors, &profile.target_monitor_name).or_else(
                             || {
@@ -170,7 +240,6 @@ impl WindowManagerApp {
                         None => continue,
                     };
 
-                    // Check if the window is currently on the right monitor.
                     let target_mon = unsafe {
                         use windows::Win32::Foundation::POINT;
                         use windows::Win32::Graphics::Gdi::MonitorFromPoint;
@@ -196,10 +265,15 @@ impl WindowManagerApp {
 
     // ─── Profile launching ───────────────────────────────────────────────
 
-    pub fn launch_profile(profile: &AppProfile, status: Arc<parking_lot::Mutex<String>>) {
+    pub fn launch_profile(
+        profile: &AppProfile,
+        status: Arc<parking_lot::Mutex<String>>,
+        log: Arc<parking_lot::Mutex<Vec<String>>>,
+    ) {
         let exe = profile.exe_path.clone();
         let device_name = profile.target_monitor_name.clone();
         let window_process_name = profile.window_process_name.clone();
+        let audio_device_id = profile.target_audio_device_id.clone();
 
         let live_monitors = get_all_monitors();
         let target_rect = Self::find_monitor_rect(&live_monitors, &device_name).or_else(|| {
@@ -213,7 +287,11 @@ impl WindowManagerApp {
         let target_rect = match target_rect {
             Some(r) => r,
             None => {
-                *status.lock() = format!("❌ Monitor '{}' not found.", device_name);
+                Self::push_status(
+                    &status,
+                    &log,
+                    format!("❌ Monitor '{}' not found.", device_name),
+                );
                 return;
             }
         };
@@ -225,28 +303,93 @@ impl WindowManagerApp {
         let child = match std::process::Command::new(&exe).current_dir(&cwd).spawn() {
             Ok(c) => c,
             Err(e) => {
-                *status.lock() = format!("❌ Failed to launch: {e}");
+                Self::push_status(&status, &log, format!("❌ Failed to launch: {e}"));
                 return;
             }
         };
         let pid = child.id();
+        let exe_name = exe
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "app".to_string());
+
+        Self::push_status(&status, &log, format!("🚀 Launched {exe_name} (PID {pid})"));
+
         std::thread::spawn(move || {
-            let hwnd = if let Some(proc_name) = window_process_name.filter(|s| !s.is_empty()) {
-                *status.lock() = format!("⏳ Waiting for '{proc_name}' window…");
+            unsafe {
+                let _ = windows::Win32::System::Com::CoInitializeEx(
+                    None,
+                    windows::Win32::System::Com::COINIT_APARTMENTTHREADED,
+                );
+            }
+
+            // ── Audio ──────────────────────────────────────────────────────
+            if let Some(ref audio_id) = audio_device_id {
+                match crate::audio::set_default_audio_device(audio_id) {
+                    Ok(_) => Self::push_status(&status, &log, "🔊 Audio device switched."),
+                    Err(e) => {
+                        Self::push_status(&status, &log, format!("⚠️ Audio switch failed: {e}"))
+                    }
+                }
+            }
+
+            // ── Window detection ───────────────────────────────────────────
+            let target_w = target_rect.right - target_rect.left;
+            let target_h = target_rect.bottom - target_rect.top;
+
+            let found = if let Some(proc_name) = window_process_name.filter(|s| !s.is_empty()) {
+                Self::push_status(
+                    &status,
+                    &log,
+                    format!("⏳ Waiting for '{proc_name}' window…"),
+                );
                 wait_for_window_by_name(&proc_name, 30_000)
             } else {
-                *status.lock() = format!("⏳ Launched PID {pid}, waiting for window…");
+                Self::push_status(&status, &log, format!("⏳ Waiting for PID {pid} window…"));
                 wait_for_window(pid, 15_000)
             };
-            match hwnd {
-                Some(h) => {
-                    move_to_monitor(h, target_rect);
-                    *status.lock() = "✅ Window locked on target monitor.".into();
+
+            // ── Move ───────────────────────────────────────────────────────
+            match found {
+                Some(f) => {
+                    Self::push_status(
+                        &status,
+                        &log,
+                        format!(
+                            "🪟 Window found ({}×{}) after {:.1}s — moving to {}×{} display…",
+                            f.width,
+                            f.height,
+                            f.elapsed_ms as f32 / 1000.0,
+                            target_w,
+                            target_h,
+                        ),
+                    );
+                    // Phase 1: aggressive initial placement (~6 s). Runs inline so
+                    // we know the window is on the right monitor before reporting done.
+                    move_window_once(f.hwnd, target_rect);
+                    Self::push_status(&status, &log, "✅ Done — window on target monitor.");
+                    // Phase 2: silent 45-second keep-alive watcher in background.
+                    // Does not block the status log.
+                    let hwnd_raw = f.hwnd.0 as isize;
+                    std::thread::spawn(move || {
+                        crate::window::watch_window_on_monitor(
+                            windows::Win32::Foundation::HWND(hwnd_raw as *mut _),
+                            target_rect,
+                            45,
+                        );
+                    });
                 }
                 None => {
-                    *status.lock() =
-                        "⚠️ Window not found within timeout (app may still work normally).".into();
+                    Self::push_status(
+                        &status,
+                        &log,
+                        "⚠️ Window not found within timeout. App may still have launched normally.",
+                    );
                 }
+            }
+
+            unsafe {
+                windows::Win32::System::Com::CoUninitialize();
             }
         });
     }
@@ -255,17 +398,22 @@ impl WindowManagerApp {
         hwnd: HWND,
         target_rect: RECT,
         status: Arc<parking_lot::Mutex<String>>,
+        log: Arc<parking_lot::Mutex<Vec<String>>>,
     ) {
         use windows::Win32::UI::WindowsAndMessaging::IsWindow;
         if unsafe { !IsWindow(Some(hwnd)).as_bool() } {
-            *status.lock() = "❌ Window no longer exists (it may have been closed).".into();
+            Self::push_status(
+                &status,
+                &log,
+                "❌ Window no longer exists (it may have been closed).",
+            );
             return;
         }
         let hwnd_raw = hwnd.0 as isize;
         std::thread::spawn(move || {
             let hwnd = HWND(hwnd_raw as *mut _);
             move_window_once(hwnd, target_rect);
-            *status.lock() = "✅ Window moved to target monitor.".into();
+            Self::push_status(&status, &log, "✅ Window moved to target monitor.");
         });
     }
 }
