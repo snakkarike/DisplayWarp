@@ -11,59 +11,17 @@ impl eframe::App for WindowManagerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.request_repaint_after(std::time::Duration::from_millis(500));
 
-        // ── Intercept close → show confirmation dialog ──────────────────
+        // ── Intercept close ────────────────────────────────────────────────
         let close_requested = ctx.input(|i| i.viewport().close_requested());
         if close_requested {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            self.show_close_dialog = true;
-        }
-
-        // ── Close confirmation popup ─────────────────────────────────────
-        if self.show_close_dialog {
-            egui::Area::new(egui::Id::new("close_dialog_overlay"))
-                .fixed_pos(egui::pos2(0.0, 0.0))
-                .show(ctx, |ui| {
-                    let screen = ctx.content_rect();
-                    let (rect, _) = ui.allocate_exact_size(screen.size(), egui::Sense::click());
-                    ui.painter()
-                        .rect_filled(rect, 0.0, egui::Color32::from_black_alpha(120));
-                });
-
-            egui::Window::new("Close DisplayWarp?")
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-                .show(ctx, |ui| {
-                    ui.add_space(4.0);
-                    ui.label("What would you like to do?");
-                    ui.add_space(8.0);
-                    ui.horizontal(|ui| {
-                        if ui
-                            .add_sized(
-                                [140.0, 30.0],
-                                egui::Button::new(format!("{} Minimize to Tray", regular::TRAY)),
-                            )
-                            .clicked()
-                        {
-                            self.show_close_dialog = false;
-                            hide_native_window(ctx);
-                        }
-                        ui.add_space(8.0);
-                        if ui
-                            .add_sized(
-                                [100.0, 30.0],
-                                egui::Button::new(format!("{} Quit", regular::POWER))
-                                    .fill(egui::Color32::from_rgb(180, 50, 50)),
-                            )
-                            .clicked()
-                        {
-                            self.watcher_running
-                                .store(false, std::sync::atomic::Ordering::Relaxed);
-                            std::process::exit(0);
-                        }
-                    });
-                    ui.add_space(4.0);
-                });
+            
+            if self.data.lock().close_to_tray {
+                hide_native_window(ctx);
+            } else {
+                self.watcher_running.store(false, std::sync::atomic::Ordering::Relaxed);
+                std::process::exit(0);
+            }
         }
 
         // ── Apply theme styling ─────────────────────────────────────
@@ -378,6 +336,38 @@ impl eframe::App for WindowManagerApp {
                                                     self.dark_mode = !self.dark_mode;
                                                 }
                                             });
+
+                                            ui.add_space(8.0);
+                                            ui.separator();
+                                            ui.add_space(8.0);
+                                            ui.label(egui::RichText::new("Application Behavior").strong());
+                                            ui.add_space(4.0);
+
+                                            let mut data = self.data.lock();
+                                            let mut dirty = false;
+
+                                            if ui.checkbox(&mut data.close_to_tray, "Minimize to tray on close").clicked() {
+                                                dirty = true;
+                                            }
+
+                                            if ui.checkbox(&mut data.start_minimized, "Start minimized to tray").clicked() {
+                                                dirty = true;
+                                            }
+
+                                            if ui.checkbox(&mut data.start_on_boot, "Start on system startup").clicked() {
+                                                dirty = true;
+                                                let al = WindowManagerApp::get_auto_launch();
+                                                if data.start_on_boot {
+                                                    let _ = al.enable();
+                                                } else {
+                                                    let _ = al.disable();
+                                                }
+                                            }
+
+                                            if dirty {
+                                                drop(data);
+                                                self.save_data();
+                                            }
                                         });
                                 });
 

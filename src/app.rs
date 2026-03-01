@@ -45,8 +45,6 @@ pub struct WindowManagerApp {
     pub watcher_running: Arc<AtomicBool>,
     // ── System tray ──
     pub tray: Option<crate::tray::TrayItems>,
-    // ── Close dialog ──
-    pub show_close_dialog: bool,
     // ── Logo texture ──
     pub logo_texture: Option<eframe::egui::TextureHandle>,
     // ── Audio state ──
@@ -84,7 +82,7 @@ impl Default for WindowManagerApp {
             live_move_mon_idx: 0,
             watcher_running: Arc::clone(&watcher_running),
             tray: None,
-            show_close_dialog: false,
+
             logo_texture: None,
             audio_devices: vec![],
             new_profile_audio_device_idx: 0,
@@ -156,6 +154,16 @@ impl WindowManagerApp {
         if let Ok(json) = serde_json::to_string_pretty(&*data) {
             let _ = std::fs::write("monitor_config.json", json);
         }
+    }
+
+    pub fn get_auto_launch() -> auto_launch::AutoLaunch {
+        let app_path =
+            std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("DisplayWarp.exe"));
+        auto_launch::AutoLaunchBuilder::new()
+            .set_app_name("DisplayWarp")
+            .set_app_path(&app_path.to_string_lossy())
+            .build()
+            .unwrap()
     }
 
     /// Find the live rect for a monitor by device name.

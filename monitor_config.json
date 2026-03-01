@@ -30,5 +30,8 @@
       "persistent_monitor": false,
       "target_audio_device_id": "{0.0.0.00000000}.{4a38ab22-e8b5-4406-860c-445888613399}"
     }
-  ]
+  ],
+  "close_to_tray": true,
+  "start_minimized": true,
+  "start_on_boot": false
 }

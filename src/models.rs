@@ -43,6 +43,12 @@ pub struct SerializableRect {
 #[derive(Serialize, Deserialize, Default)]
 pub struct SavedData {
     pub profiles: Vec<AppProfile>,
+    #[serde(default)]
+    pub close_to_tray: bool,
+    #[serde(default)]
+    pub start_minimized: bool,
+    #[serde(default)]
+    pub start_on_boot: bool,
 }
 
 // ─── Runtime State ───────────────────────────────────────────────────────────

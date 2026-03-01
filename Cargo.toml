@@ -1,13 +1,11 @@
 [package]
 name = "DisplayWarp"
-version = "1.0.8"
+version = "1.0.9"
 edition = "2024"
 
 [package.metadata.winresource]
 OriginalFilename = "DisplayWarp.exe"
 LegalCopyright = "Copyright © 2026"
-ProductVersion = "1.0.8"
-FileVersion = "1.0.8"
 FileDescription = "DisplayWarp"
 CompanyName = "GradeLabs"
 ProductName = "DisplayWarp"
@@ -49,6 +47,7 @@ windows-sys = { version = "0.61.2", features = [
 ] }
 egui_commonmark = "0.22.0"
 egui_extras = { version = "0.30", features = ["image"] }
+auto-launch = "0.6.0"
 
 [profile.release]
 opt-level = "z"   # optimize for size

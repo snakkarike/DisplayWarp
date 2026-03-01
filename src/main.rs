@@ -35,8 +35,17 @@ fn main() -> eframe::Result {
         height: h,
     };
 
+    // Pre-load data to check for "Start Minimized" configuration
+    let mut start_visible = true;
+    if let Ok(bytes) = std::fs::read("monitor_config.json") {
+        if let Ok(decoded) = serde_json::from_slice::<models::SavedData>(&bytes) {
+            start_visible = !decoded.start_minimized;
+        }
+    }
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
+            .with_visible(start_visible)
             .with_inner_size([980.0, 900.0])
             .with_min_inner_size([960.0, 880.0])
             .with_icon(std::sync::Arc::new(icon)),
