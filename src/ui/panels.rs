@@ -1153,7 +1153,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                     );
 
                     // Draw background grid with fadeout at edges
-                    let step = 20.0;
+                    let step = 16.0;
                     let fade_margin = 60.0;
                     let max_alpha = 18.0;
 
@@ -1290,14 +1290,15 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                                 let width = orig_rect.right - orig_rect.left;
                                 let height = orig_rect.bottom - orig_rect.top;
 
-                                // 40px Grid Snapping
+                                // 100px Grid Snapping
                                 let target_left =
                                     (orig_rect.left + delta_virtual_x).clamp(-16000, 16000);
                                 let target_top =
                                     (orig_rect.top + delta_virtual_y).clamp(-16000, 16000);
 
-                                let snapped_left = (target_left as f32 / 40.0).round() as i32 * 40;
-                                let snapped_top = (target_top as f32 / 40.0).round() as i32 * 40;
+                                let snapped_left =
+                                    (target_left as f32 / 256.0).round() as i32 * 256;
+                                let snapped_top = (target_top as f32 / 256.0).round() as i32 * 256;
 
                                 let new_rect = crate::models::SerializableRect {
                                     left: snapped_left,
@@ -1500,6 +1501,23 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                                         },
                                     ))
                                     .show(ui, |ui| {
+                                        let response = ui.interact(
+                                            ui.max_rect(),
+                                            ui.id().with(i),
+                                            egui::Sense::click(),
+                                        );
+                                        if response.clicked() {
+                                            for profile_mon in &p.monitors {
+                                                if let Some(mon) =
+                                                    app.monitors.iter_mut().find(|m| {
+                                                        m.device_name == profile_mon.device_name
+                                                    })
+                                                {
+                                                    mon.rect = profile_mon.rect.to_rect();
+                                                }
+                                            }
+                                        }
+
                                         ui.horizontal(|ui| {
                                             ui.label(egui::RichText::new(&p.name).strong());
                                             ui.with_layout(
