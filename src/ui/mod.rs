@@ -433,7 +433,7 @@ impl eframe::App for WindowManagerApp {
                                             ui.add_space(8.0);
 
                                             ui.label(egui::RichText::new("DisplayWarp").size(20.0).strong());
-                                            ui.label(egui::RichText::new("Version: v1.0.6").color(egui::Color32::GRAY));
+                                            ui.label(egui::RichText::new(format!("Version: v{}", env!("CARGO_PKG_VERSION"))).color(egui::Color32::GRAY));
                                             ui.add_space(12.0);
                                             ui.label("A tool for easily moving running applications exactly between virtual/real displays.");
                                             ui.add_space(16.0);
@@ -447,9 +447,8 @@ impl eframe::App for WindowManagerApp {
                                                 .id_salt("changelog_scroll")
                                                 .auto_shrink([false; 2])
                                                 .show(ui, |ui| {
-                                                    let changelog = self.changelog.lock().clone();
                                                     egui_commonmark::CommonMarkViewer::new()
-                                                        .show(ui, &mut self.markdown_cache, &changelog);
+                                                        .show(ui, &mut self.markdown_cache, include_str!("../../CHANGELOG.md"));
                                                 });
                                         });
                                 });

@@ -1,13 +1,13 @@
 [package]
 name = "DisplayWarp"
-version = "1.0.6"
+version = "1.0.7"
 edition = "2024"
 
 [package.metadata.winresource]
 OriginalFilename = "DisplayWarp.exe"
 LegalCopyright = "Copyright © 2026"
-ProductVersion = "1.0.6"
-FileVersion = "1.0.6"
+ProductVersion = "1.0.7"
+FileVersion = "1.0.7"
 FileDescription = "DisplayWarp"
 CompanyName = "GradeLabs"
 ProductName = "DisplayWarp"
@@ -47,9 +47,8 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_System_Com_StructuredStorage",
     "Win32_System_Variant",
 ] }
-ureq = { version = "2", features = ["json"] }
 egui_commonmark = "0.22.0"
-egui_extras = { version = "0.30", features = ["svg", "image"] }
+egui_extras = { version = "0.30", features = ["image"] }
 
 [profile.release]
 opt-level = "z"   # optimize for size
