@@ -427,13 +427,13 @@ impl eframe::App for WindowManagerApp {
 
                                             if self.dark_mode {
                                                 ui.add(
-                                                    egui::Image::new(egui::include_image!("../../assets/DisplayWarpLogoDark.png"))
+                                                    egui::Image::new(egui::include_image!("../../assets/DisplayWarpLogoWhite.png"))
                                                         .max_width(200.0)
                                                         .maintain_aspect_ratio(true)
                                                 );
                                             } else {
                                                 ui.add(
-                                                    egui::Image::new(egui::include_image!("../../assets/DisplayWarpLogo.png"))
+                                                    egui::Image::new(egui::include_image!("../../assets/DisplayWarpLogoBlack.png"))
                                                         .max_width(200.0)
                                                         .maintain_aspect_ratio(true)
                                                 );
