@@ -110,7 +110,7 @@ impl eframe::App for WindowManagerApp {
                     .inner_margin(egui::Margin::same(8))
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new("v1.0.6").small().color(
+                            ui.label(egui::RichText::new("v1.0.7").small().color(
                                 if self.dark_mode {
                                     egui::Color32::GRAY
                                 } else {
