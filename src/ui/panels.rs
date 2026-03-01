@@ -1081,7 +1081,7 @@ pub fn draw_status_bar(app: &WindowManagerApp, ui: &mut egui::Ui) {
                         } else {
                             egui::Color32::from_gray(100)
                         };
-                        ui.label(egui::RichText::new(line).small().color(color));
+                        ui.label(egui::RichText::new(line).color(color));
                     }
                 });
         });
