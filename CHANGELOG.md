@@ -1,3 +1,26 @@
+## v1.0.9
+
+### ✨ New Features
+
+- **Interactive Monitor Arrangement**: Added a new **Display** tab with a drag-and-drop canvas for rearranging monitors.
+- **Grid Snapping**: Implemented a firm 256px virtual grid snapping for perfect monitor alignment.
+- **Collision Detection**: Prevents monitor boxes from overlapping in the arrangement UI.
+- **Display Profiles**: Save, delete, and instantly preview monitor layouts by clicking profile cards.
+- **Visual Grid**: Added a matching visual grid to the arrangement canvas.
+
+### 🎨 UI & UX Improvements
+
+- **Responsive Layout**: Rebuilt Display tab with a 60/40 split and full-height auto-scaling columns.
+- **Improved Stability**: Fixed layout overflows and ensured consistent vertical sizing.
+
+### 🛠️ Fixes & Optimizations
+
+- **Binary Size Reduction**: Optimized release profile for smaller executable size (opt-level "z", LTO).
+- **Asset Optimization**: Replaced SVG rendering with lightweight PNG icons.
+- **Branding**: Official executable icon embedded via `winresource`.
+
+---
+
 ## v1.0.8
 
 ### 🔧 Fixes
