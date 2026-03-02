@@ -1218,7 +1218,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
 
                     // Interactive Dragging Canvas
                     let (response, painter) = ui.allocate_painter(
-                        egui::vec2(ui.available_width(), col_height - 280.0),
+                        egui::vec2(ui.available_width(), col_height - 160.0),
                         egui::Sense::drag(),
                     );
                     let rect = response.rect;
@@ -1642,6 +1642,8 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
         ui.vertical(|ui| {
             ui.set_width(total_width * 0.40 - 8.0);
             ui.set_min_height(col_height);
+
+            // Monitor Settings
             egui::Frame::group(ui.style())
                 .inner_margin(egui::Margin::same(12))
                 .corner_radius(egui::CornerRadius::same(8))
@@ -1660,210 +1662,201 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                 ))
                 .show(ui, |ui| {
                     ui.set_width(ui.available_width());
-                    ui.set_min_height(ui.available_height());
+                    ui.label(
+                        egui::RichText::new(format!("{} Monitor Settings", regular::GEAR))
+                            .size(16.0)
+                            .strong(),
+                    );
+                    ui.label(
+                        egui::RichText::new("Click a monitor in the canvas above to configure it.")
+                            .small()
+                            .color(if app.dark_mode {
+                                egui::Color32::from_gray(140)
+                            } else {
+                                egui::Color32::from_gray(100)
+                            }),
+                    );
+                    ui.add_space(8.0);
 
-                    // Monitor Settings
-                    egui::Frame::group(ui.style())
-                        .inner_margin(egui::Margin::same(12))
-                        .corner_radius(egui::CornerRadius::same(8))
-                        .fill(if app.dark_mode {
-                            egui::Color32::from_rgb(30, 41, 59)
-                        } else {
-                            egui::Color32::from_rgb(241, 245, 249)
-                        })
-                        .show(ui, |ui| {
-                            ui.set_width(ui.available_width());
-                            ui.label(
-                                egui::RichText::new(format!("{} Monitor Settings", regular::GEAR))
-                                    .size(16.0)
-                                    .strong(),
-                            );
-                            ui.label(
-                                egui::RichText::new(
-                                    "Click a monitor in the canvas above to configure it.",
-                                )
-                                .small()
-                                .color(if app.dark_mode {
-                                    egui::Color32::from_gray(140)
+                    if let Some(selected_idx) = app.selected_display_idx {
+                        if let Some(selected_mon) = app.display_targets.get(selected_idx).cloned() {
+                            egui::Frame::group(ui.style())
+                                .fill(if app.dark_mode {
+                                    egui::Color32::from_rgb(15, 23, 42)
                                 } else {
-                                    egui::Color32::from_gray(100)
-                                }),
-                            );
-                            ui.add_space(8.0);
+                                    egui::Color32::from_rgb(255, 255, 255)
+                                })
+                                .show(ui, |ui| {
+                                    ui.set_width(ui.available_width());
 
-                            if let Some(selected_idx) = app.selected_display_idx {
-                                if let Some(selected_mon) =
-                                    app.display_targets.get(selected_idx).cloned()
-                                {
-                                    egui::Frame::group(ui.style())
-                                        .fill(if app.dark_mode {
-                                            egui::Color32::from_rgb(15, 23, 42)
-                                        } else {
-                                            egui::Color32::from_rgb(255, 255, 255)
-                                        })
-                                        .show(ui, |ui| {
-                                            ui.set_width(ui.available_width());
+                                    let mut name = selected_mon
+                                        .hardware_name
+                                        .clone()
+                                        .unwrap_or_else(|| selected_mon.device_name.clone());
+                                    if name.is_empty() {
+                                        name = "Unknown Display".to_string();
+                                    }
 
-                                            let mut name =
-                                                selected_mon.hardware_name.clone().unwrap_or_else(
-                                                    || selected_mon.device_name.clone(),
-                                                );
-                                            if name.is_empty() {
-                                                name = "Unknown Display".to_string();
-                                            }
-
-                                            ui.horizontal(|ui| {
-                                                ui.label(
-                                                    egui::RichText::new(&name).size(14.0).strong(),
-                                                );
-                                                ui.with_layout(
-                                                    egui::Layout::right_to_left(
-                                                        egui::Align::Center,
-                                                    ),
-                                                    |ui| {
-                                                        if ui
-                                                            .button(format!("{}", regular::X))
-                                                            .on_hover_text("Deselect")
-                                                            .clicked()
-                                                        {
-                                                            app.selected_display_idx = None;
-                                                        }
-                                                    },
-                                                );
-                                            });
-                                            ui.separator();
-
-                                            let rect = app
-                                                .monitors
-                                                .iter()
-                                                .find(|m| m.device_name == selected_mon.device_name)
-                                                .map(|m| m.rect)
-                                                .unwrap_or(selected_mon.rect);
-
-                                            ui.label(format!(
-                                                "Resolution: {}x{}",
-                                                rect.right - rect.left,
-                                                rect.bottom - rect.top
-                                            ));
-
-                                            ui.add_space(8.0);
-
-                                            // Topology Dropdown
-                                            ui.label("Topology:");
-                                            let current_text = if !selected_mon.is_active {
-                                                "Disconnected"
-                                            } else {
-                                                "Extend / Active"
-                                            };
-
-                                            let mut next_topology = None;
-                                            egui::ComboBox::from_id_salt("topology_combo")
-                                                .selected_text(current_text)
-                                                .show_ui(ui, |ui| {
-                                                    if ui
-                                                        .selectable_label(
-                                                            !selected_mon.is_active,
-                                                            "Disconnected",
-                                                        )
-                                                        .clicked()
-                                                    {
-                                                        next_topology =
-                                                            Some("Disconnect".to_string());
-                                                    }
-                                                    if ui
-                                                        .selectable_label(
-                                                            selected_mon.is_active,
-                                                            "Extend desktop to this display",
-                                                        )
-                                                        .clicked()
-                                                    {
-                                                        next_topology = Some("Extend".to_string());
-                                                    }
-
-                                                    ui.separator();
-                                                    ui.label(
-                                                        egui::RichText::new("Duplicate Desktop...")
-                                                            .small()
-                                                            .weak(),
-                                                    );
-
-                                                    for (i, other) in
-                                                        app.display_targets.iter().enumerate()
-                                                    {
-                                                        if i != selected_idx && other.is_active {
-                                                            let other_name = other
-                                                                .hardware_name
-                                                                .as_deref()
-                                                                .unwrap_or(&other.device_name);
-                                                            let my_name = selected_mon
-                                                                .hardware_name
-                                                                .as_deref()
-                                                                .unwrap_or(
-                                                                    &selected_mon.device_name,
-                                                                );
-
-                                                            // Provide duplicate option
-                                                            if ui
-                                                                .selectable_label(
-                                                                    false,
-                                                                    format!(
-                                                                        "Duplicate {} and {}",
-                                                                        my_name, other_name
-                                                                    ),
-                                                                )
-                                                                .clicked()
-                                                            {
-                                                                next_topology = Some(format!(
-                                                                    "DuplicateWith:{}",
-                                                                    other.target_id.unwrap_or(0)
-                                                                ));
-                                                            }
-                                                        }
-                                                    }
-                                                });
-
-                                            if let Some(next) = next_topology {
-                                                if let Some(target_id) = selected_mon.target_id {
-                                                    crate::monitor::set_monitor_state(
-                                                        target_id, &next,
-                                                    );
-                                                    app.refresh_monitors();
+                                    ui.horizontal(|ui| {
+                                        ui.label(egui::RichText::new(&name).size(14.0).strong());
+                                        ui.with_layout(
+                                            egui::Layout::right_to_left(egui::Align::Center),
+                                            |ui| {
+                                                if ui
+                                                    .button(format!("{}", regular::X))
+                                                    .on_hover_text("Deselect")
+                                                    .clicked()
+                                                {
+                                                    app.selected_display_idx = None;
                                                 }
+                                            },
+                                        );
+                                    });
+                                    ui.separator();
+
+                                    let rect = app
+                                        .monitors
+                                        .iter()
+                                        .find(|m| m.device_name == selected_mon.device_name)
+                                        .map(|m| m.rect)
+                                        .unwrap_or(selected_mon.rect);
+
+                                    ui.label(format!(
+                                        "Resolution: {}x{}",
+                                        rect.right - rect.left,
+                                        rect.bottom - rect.top
+                                    ));
+
+                                    ui.add_space(8.0);
+
+                                    // Topology Dropdown
+                                    ui.label("Topology:");
+                                    let current_text = if !selected_mon.is_active {
+                                        "Disconnected"
+                                    } else {
+                                        "Extend / Active"
+                                    };
+
+                                    let mut next_topology = None;
+                                    egui::ComboBox::from_id_salt("topology_combo")
+                                        .selected_text(current_text)
+                                        .show_ui(ui, |ui| {
+                                            if ui
+                                                .selectable_label(
+                                                    !selected_mon.is_active,
+                                                    "Disconnected",
+                                                )
+                                                .clicked()
+                                            {
+                                                next_topology = Some("Disconnect".to_string());
+                                            }
+                                            if ui
+                                                .selectable_label(
+                                                    selected_mon.is_active,
+                                                    "Extend desktop to this display",
+                                                )
+                                                .clicked()
+                                            {
+                                                next_topology = Some("Extend".to_string());
                                             }
 
-                                            ui.add_space(8.0);
+                                            ui.separator();
+                                            ui.label(
+                                                egui::RichText::new("Duplicate Desktop...")
+                                                    .small()
+                                                    .weak(),
+                                            );
 
-                                            // Make Primary
-                                            let is_primary = rect.left == 0 && rect.top == 0;
-                                            let mut check_primary = is_primary;
-                                            if ui
-                                                .checkbox(
-                                                    &mut check_primary,
-                                                    "Make this my main display",
-                                                )
-                                                .changed()
-                                                && check_primary
+                                            for (i, other) in app.display_targets.iter().enumerate()
                                             {
-                                                if let Some(target_id) = selected_mon.target_id {
-                                                    crate::monitor::set_primary_monitor(target_id);
-                                                    std::thread::sleep(
-                                                        std::time::Duration::from_millis(500),
-                                                    );
-                                                    app.refresh_monitors();
+                                                if i != selected_idx && other.is_active {
+                                                    let other_name = other
+                                                        .hardware_name
+                                                        .as_deref()
+                                                        .unwrap_or(&other.device_name);
+                                                    let my_name = selected_mon
+                                                        .hardware_name
+                                                        .as_deref()
+                                                        .unwrap_or(&selected_mon.device_name);
+
+                                                    // Provide duplicate option
+                                                    if ui
+                                                        .selectable_label(
+                                                            false,
+                                                            format!(
+                                                                "Duplicate {} and {}",
+                                                                my_name, other_name
+                                                            ),
+                                                        )
+                                                        .clicked()
+                                                    {
+                                                        next_topology = Some(format!(
+                                                            "DuplicateWith:{}",
+                                                            other.target_id.unwrap_or(0)
+                                                        ));
+                                                    }
                                                 }
                                             }
                                         });
-                                }
-                            } else {
-                                ui.vertical_centered(|ui| {
-                                    ui.add_space(10.0);
-                                    ui.label(egui::RichText::new("No monitor selected.").weak());
-                                    ui.add_space(10.0);
-                                });
-                            }
-                        });
 
-                    ui.add_space(16.0);
+                                    if let Some(next) = next_topology {
+                                        if let Some(target_id) = selected_mon.target_id {
+                                            crate::monitor::set_monitor_state(target_id, &next);
+                                            app.refresh_monitors();
+                                        }
+                                    }
+
+                                    ui.add_space(8.0);
+
+                                    // Make Primary
+                                    let is_primary = rect.left == 0 && rect.top == 0;
+                                    let mut check_primary = is_primary;
+                                    if ui
+                                        .checkbox(&mut check_primary, "Make this my main display")
+                                        .changed()
+                                        && check_primary
+                                    {
+                                        if let Some(target_id) = selected_mon.target_id {
+                                            crate::monitor::set_primary_monitor(target_id);
+                                            std::thread::sleep(std::time::Duration::from_millis(
+                                                500,
+                                            ));
+                                            app.refresh_monitors();
+                                        }
+                                    }
+                                });
+                        }
+                    } else {
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(10.0);
+                            ui.label(egui::RichText::new("No monitor selected.").weak());
+                            ui.add_space(10.0);
+                        });
+                    }
+                }); // End Monitor Settings
+
+            ui.add_space(16.0);
+
+            // Saved Display Profiles List
+            egui::Frame::group(ui.style())
+                .inner_margin(egui::Margin::same(12))
+                .corner_radius(egui::CornerRadius::same(8))
+                .fill(if app.dark_mode {
+                    egui::Color32::from_rgb(25, 25, 25)
+                } else {
+                    egui::Color32::from_rgb(248, 250, 252)
+                })
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    if app.dark_mode {
+                        egui::Color32::from_rgb(44, 44, 44)
+                    } else {
+                        egui::Color32::from_rgb(226, 232, 240)
+                    },
+                ))
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.set_min_height(ui.available_height()); // fill the rest of the height
 
                     ui.label(
                         egui::RichText::new(format!("{} Saved Profiles", regular::BOOKMARK_SIMPLE))

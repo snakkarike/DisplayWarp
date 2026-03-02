@@ -2,7 +2,7 @@ use windows::Win32::Devices::Display::{
     DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME, DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME,
     DISPLAYCONFIG_MODE_INFO, DISPLAYCONFIG_PATH_INFO, DISPLAYCONFIG_SOURCE_DEVICE_NAME,
     DISPLAYCONFIG_TARGET_DEVICE_NAME, DisplayConfigGetDeviceInfo, GetDisplayConfigBufferSizes,
-    QDC_ALL_PATHS, QDC_DATABASE_CURRENT, QueryDisplayConfig,
+    QDC_DATABASE_CURRENT, QueryDisplayConfig,
 };
 use windows::Win32::Foundation::WIN32_ERROR;
 
@@ -43,9 +43,9 @@ fn test_topo() {
             source_name.header.adapterId = path.sourceInfo.adapterId;
             source_name.header.id = path.sourceInfo.id;
 
-            let mut device_name = String::new();
+            let mut _device_name: String = String::new();
             if DisplayConfigGetDeviceInfo(&mut source_name.header) == 0 {
-                device_name = String::from_utf16_lossy(&source_name.viewGdiDeviceName)
+                _device_name = String::from_utf16_lossy(&source_name.viewGdiDeviceName)
                     .trim_matches(char::from(0))
                     .to_string();
             }

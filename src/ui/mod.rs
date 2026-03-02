@@ -397,53 +397,54 @@ impl eframe::App for WindowManagerApp {
 
                                                     let config_path = crate::app::WindowManagerApp::get_config_path();
 
-                                                    ui.horizontal(|ui| {
-                                                        ui.label(
-                                                            egui::RichText::new(config_path.to_string_lossy().to_string())
-                                                                .code()
-                                                                .color(if self.dark_mode {
-                                                                    egui::Color32::LIGHT_GRAY
-                                                                } else {
-                                                                    egui::Color32::DARK_GRAY
-                                                                })
-                                                        );
-
-                                                        ui.add_space(8.0);
-
-                                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                                            if ui.button(format!("{} Open Folder", regular::FOLDER_OPEN)).clicked() 
-                                                                && let Some(parent) = config_path.parent() {
-                                                                    let _ = std::process::Command::new("explorer")
-                                                                        .arg(parent)
-                                                                        .spawn();
-                                                            }
-                                                            if ui.button(format!("{} Change", regular::PENCIL_SIMPLE)).clicked() 
-                                                                && let Some(folder) = rfd::FileDialog::new().pick_folder() {
-                                                                    let exe_dir = std::env::current_exe()
-                                                                        .unwrap_or_else(|_| std::path::PathBuf::from("."))
-                                                                        .parent()
-                                                                        .unwrap_or_else(|| std::path::Path::new("."))
-                                                                        .to_path_buf();
-
-                                                                    let new_config_file = folder.join("monitor_config.json");
-
-                                                                    // Only move if there isn't already a config in the new folder
-                                                                    if config_path.exists() && !new_config_file.exists() {
-                                                                        let _ = std::fs::copy(&config_path, &new_config_file);
-                                                                    }
-
-                                                                    let _ = std::fs::write(
-                                                                        exe_dir.join("config_location.txt"),
-                                                                        folder.to_string_lossy().as_ref(),
-                                                                    );
-
-                                                                    crate::app::WindowManagerApp::push_status(
-                                                                        &self.status_message,
-                                                                        &self.status_log,
-                                                                        "📁 Config location updated.",
-                                                                    );
-                                                            }
+                                                    egui::ScrollArea::horizontal()
+                                                        .id_salt("config_path_scroll")
+                                                        .show(ui, |ui| {
+                                                            ui.label(
+                                                                egui::RichText::new(config_path.to_string_lossy().to_string())
+                                                                    .code()
+                                                                    .color(if self.dark_mode {
+                                                                        egui::Color32::LIGHT_GRAY
+                                                                    } else {
+                                                                        egui::Color32::DARK_GRAY
+                                                                    })
+                                                            );
                                                         });
+
+                                                    ui.add_space(4.0);
+
+                                                    ui.horizontal(|ui| {
+                                                        if ui.button(format!("{} Open Folder", regular::FOLDER_OPEN)).clicked()
+                                                            && let Some(parent) = config_path.parent() {
+                                                                let _ = std::process::Command::new("explorer")
+                                                                    .arg(parent)
+                                                                    .spawn();
+                                                        }
+                                                        if ui.button(format!("{} Change", regular::PENCIL_SIMPLE)).clicked()
+                                                            && let Some(folder) = rfd::FileDialog::new().pick_folder() {
+                                                                let exe_dir = std::env::current_exe()
+                                                                    .unwrap_or_else(|_| std::path::PathBuf::from("."))
+                                                                    .parent()
+                                                                    .unwrap_or_else(|| std::path::Path::new("."))
+                                                                    .to_path_buf();
+
+                                                                let new_config_file = folder.join("monitor_config.json");
+
+                                                                if config_path.exists() && !new_config_file.exists() {
+                                                                    let _ = std::fs::copy(&config_path, &new_config_file);
+                                                                }
+
+                                                                let _ = std::fs::write(
+                                                                    exe_dir.join("config_location.txt"),
+                                                                    folder.to_string_lossy().as_ref(),
+                                                                );
+
+                                                                crate::app::WindowManagerApp::push_status(
+                                                                    &self.status_message,
+                                                                    &self.status_log,
+                                                                    "📁 Config location updated.",
+                                                                );
+                                                        }
                                                     });
                                                 });
 
