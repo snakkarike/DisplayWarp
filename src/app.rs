@@ -23,6 +23,7 @@ pub enum AppTab {
 
 pub struct WindowManagerApp {
     pub monitors: Vec<MonitorInfo>,
+    pub display_targets: Vec<MonitorInfo>,
     /// Shared so the background watcher can read profiles.
     pub data: Arc<parking_lot::Mutex<SavedData>>,
     // ── Navigation ──
@@ -76,6 +77,7 @@ impl Default for WindowManagerApp {
 
         let mut app = Self {
             monitors: vec![],
+            display_targets: vec![],
             data: Arc::clone(&data),
             current_tab: AppTab::Warp,
             new_profile_name: String::new(),
@@ -141,6 +143,7 @@ impl WindowManagerApp {
 
     pub fn refresh_monitors(&mut self) {
         self.monitors = get_all_monitors();
+        self.display_targets = crate::monitor::get_all_display_targets();
         let max = self.monitors.len().saturating_sub(1);
         self.selected_mon_idx = self.selected_mon_idx.min(max);
         self.edit_profile_mon_idx = self.edit_profile_mon_idx.min(max);
@@ -158,8 +161,25 @@ impl WindowManagerApp {
         }
     }
 
+    pub fn get_config_path() -> std::path::PathBuf {
+        let exe_dir = std::env::current_exe()
+            .unwrap_or_else(|_| std::path::PathBuf::from("."))
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .to_path_buf();
+
+        if let Ok(content) = std::fs::read_to_string(exe_dir.join("config_location.txt")) {
+            let path = std::path::PathBuf::from(content.trim());
+            if path.is_dir() {
+                return path.join("monitor_config.json");
+            }
+        }
+
+        exe_dir.join("monitor_config.json")
+    }
+
     pub fn load_data(&mut self) {
-        if let Ok(bytes) = std::fs::read("monitor_config.json") {
+        if let Ok(bytes) = std::fs::read(Self::get_config_path()) {
             if let Ok(decoded) = serde_json::from_slice::<SavedData>(&bytes) {
                 *self.data.lock() = decoded;
             }
@@ -169,7 +189,7 @@ impl WindowManagerApp {
     pub fn save_data(&self) {
         let data = self.data.lock();
         if let Ok(json) = serde_json::to_string_pretty(&*data) {
-            let _ = std::fs::write("monitor_config.json", json);
+            let _ = std::fs::write(Self::get_config_path(), json);
         }
     }
 

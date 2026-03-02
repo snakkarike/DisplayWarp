@@ -23,11 +23,12 @@ impl eframe::App for WindowManagerApp {
         let close_requested = ctx.input(|i| i.viewport().close_requested());
         if close_requested {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            
+
             if self.data.lock().close_to_tray {
                 hide_native_window(ctx);
             } else {
-                self.watcher_running.store(false, std::sync::atomic::Ordering::Relaxed);
+                self.watcher_running
+                    .store(false, std::sync::atomic::Ordering::Relaxed);
                 std::process::exit(0);
             }
         }
@@ -76,29 +77,38 @@ impl eframe::App for WindowManagerApp {
                     .inner_margin(egui::Margin::same(8))
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                                ui.label(egui::RichText::new(format!("v{}", env!("CARGO_PKG_VERSION"))).color(
-                                if self.dark_mode {
-                                    egui::Color32::GRAY
-                                } else {
-                                    egui::Color32::from_gray(100)
-                                },
-                            ));
-
                             ui.with_layout(
-                                egui::Layout::right_to_left(egui::Align::Center),
+                                egui::Layout::left_to_right(egui::Align::Center),
                                 |ui| {
-                                    let theme_icon = if self.dark_mode {
-                                        regular::SUN
-                                    } else {
-                                        regular::MOON
-                                    };
-                                    if ui.button(theme_icon).clicked() {
-                                        self.dark_mode = !self.dark_mode;
-                                    }
+                                    ui.label(
+                                        egui::RichText::new(format!(
+                                            "v{}",
+                                            env!("CARGO_PKG_VERSION")
+                                        ))
+                                        .color(
+                                            if self.dark_mode {
+                                                egui::Color32::GRAY
+                                            } else {
+                                                egui::Color32::from_gray(100)
+                                            },
+                                        ),
+                                    );
+
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center),
+                                        |ui| {
+                                            let theme_icon = if self.dark_mode {
+                                                regular::SUN
+                                            } else {
+                                                regular::MOON
+                                            };
+                                            if ui.button(theme_icon).clicked() {
+                                                self.dark_mode = !self.dark_mode;
+                                            }
+                                        },
+                                    );
                                 },
                             );
-                        });
                         });
                     });
             });
@@ -115,7 +125,7 @@ impl eframe::App for WindowManagerApp {
                 } else {
                     &self.logo_texture
                 };
-                
+
                 if let Some(tex) = logo_option {
                     ui.image(egui::load::SizedTexture::new(
                         tex.id(),
@@ -123,7 +133,7 @@ impl eframe::App for WindowManagerApp {
                     ));
                     ui.add_space(8.0);
                 }
-                
+
                 ui.selectable_value(&mut self.current_tab, AppTab::Warp, "Warp");
                 ui.selectable_value(&mut self.current_tab, AppTab::Display, "Display");
                 ui.selectable_value(&mut self.current_tab, AppTab::Log, "Log");
@@ -211,7 +221,15 @@ impl eframe::App for WindowManagerApp {
                                                 .size(14.0)
                                                 .strong(),
                                             );
-                                            ui.add_space(8.0);
+                                            ui.label(
+                                                egui::RichText::new("Create a configuration to automatically move a window to a selected monitor when launched.")
+                                                    .small()
+                                                    .color(if self.dark_mode {
+                                                        egui::Color32::from_gray(140)
+                                                    } else {
+                                                        egui::Color32::from_gray(100)
+                                                    }),
+                                            );
                                             panels::draw_new_profile_form(self, ui);
                                         });
                                 });
@@ -245,6 +263,15 @@ impl eframe::App for WindowManagerApp {
                                                 ))
                                                 .size(14.0)
                                                 .strong(),
+                                            );
+                                            ui.label(
+                                                egui::RichText::new("Manage your created window profiles.")
+                                                    .small()
+                                                    .color(if self.dark_mode {
+                                                        egui::Color32::from_gray(140)
+                                                    } else {
+                                                        egui::Color32::from_gray(100)
+                                                    }),
                                             );
                                             ui.add_space(8.0);
                                             egui::ScrollArea::vertical()
@@ -294,6 +321,15 @@ impl eframe::App for WindowManagerApp {
                                         .size(16.0)
                                         .strong(),
                                     );
+                                    ui.label(
+                                        egui::RichText::new("View background service activity and errors.")
+                                            .small()
+                                            .color(if self.dark_mode {
+                                                egui::Color32::from_gray(140)
+                                            } else {
+                                                egui::Color32::from_gray(100)
+                                            }),
+                                    );
                                     ui.add_space(8.0);
                                     panels::draw_status_bar(self, ui);
                                 });
@@ -336,8 +372,82 @@ impl eframe::App for WindowManagerApp {
                                                 .size(16.0)
                                                 .strong(),
                                             );
+                                            ui.label(
+                                                egui::RichText::new("Configure DisplayWarp behavior and preferences.")
+                                                    .small()
+                                                    .color(if self.dark_mode {
+                                                        egui::Color32::from_gray(140)
+                                                    } else {
+                                                        egui::Color32::from_gray(100)
+                                                    }),
+                                            );
                                             ui.add_space(16.0);
 
+
+                                            // Config Location Card
+                                            egui::Frame::group(ui.style())
+                                                .inner_margin(egui::Margin::same(12))
+                                                .corner_radius(egui::CornerRadius::same(8))
+                                                .fill(if self.dark_mode { egui::Color32::from_rgb(34, 34, 34) } else { egui::Color32::from_rgb(241, 245, 249) })
+                                                .stroke(egui::Stroke::new(1.0, if self.dark_mode { egui::Color32::from_rgb(44, 44, 44) } else { egui::Color32::from_rgb(226, 232, 240) }))
+                                                .show(ui, |ui| {
+                                                    ui.set_width(ui.available_width());
+                                                    ui.label(egui::RichText::new("Config Location").strong());
+                                                    ui.add_space(8.0);
+
+                                                    let config_path = crate::app::WindowManagerApp::get_config_path();
+
+                                                    ui.horizontal(|ui| {
+                                                        ui.label(
+                                                            egui::RichText::new(config_path.to_string_lossy().to_string())
+                                                                .code()
+                                                                .color(if self.dark_mode {
+                                                                    egui::Color32::LIGHT_GRAY
+                                                                } else {
+                                                                    egui::Color32::DARK_GRAY
+                                                                })
+                                                        );
+
+                                                        ui.add_space(8.0);
+
+                                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                            if ui.button(format!("{} Open Folder", regular::FOLDER_OPEN)).clicked() 
+                                                                && let Some(parent) = config_path.parent() {
+                                                                    let _ = std::process::Command::new("explorer")
+                                                                        .arg(parent)
+                                                                        .spawn();
+                                                            }
+                                                            if ui.button(format!("{} Change", regular::PENCIL_SIMPLE)).clicked() 
+                                                                && let Some(folder) = rfd::FileDialog::new().pick_folder() {
+                                                                    let exe_dir = std::env::current_exe()
+                                                                        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+                                                                        .parent()
+                                                                        .unwrap_or_else(|| std::path::Path::new("."))
+                                                                        .to_path_buf();
+
+                                                                    let new_config_file = folder.join("monitor_config.json");
+
+                                                                    // Only move if there isn't already a config in the new folder
+                                                                    if config_path.exists() && !new_config_file.exists() {
+                                                                        let _ = std::fs::copy(&config_path, &new_config_file);
+                                                                    }
+
+                                                                    let _ = std::fs::write(
+                                                                        exe_dir.join("config_location.txt"),
+                                                                        folder.to_string_lossy().as_ref(),
+                                                                    );
+
+                                                                    crate::app::WindowManagerApp::push_status(
+                                                                        &self.status_message,
+                                                                        &self.status_log,
+                                                                        "📁 Config location updated.",
+                                                                    );
+                                                            }
+                                                        });
+                                                    });
+                                                });
+
+                                            ui.add_space(8.0);
 
                                             // Theme Card
                                             egui::Frame::group(ui.style())
@@ -427,7 +537,7 @@ impl eframe::App for WindowManagerApp {
                                                         drop(data);
                                                         self.save_data();
                                                     }
-                                                    
+
                                                     ui.add_space(6.0);
                                                     ui.label(
                                                         egui::RichText::new("Controls how often DisplayWarp scans application placement to enforce persistence rules. Lower speeds save CPU.")
@@ -490,12 +600,12 @@ impl eframe::App for WindowManagerApp {
                                             ui.add_space(12.0);
                                             ui.label("A tool for easily moving running applications exactly between virtual/real displays.");
                                             ui.add_space(16.0);
-                                            
+
                                             ui.separator();
                                             ui.add_space(8.0);
                                             ui.label(egui::RichText::new("Latest Release Changelog").strong());
                                             ui.add_space(4.0);
-                                            
+
                                             egui::ScrollArea::vertical()
                                                 .id_salt("changelog_scroll")
                                                 .auto_shrink([false; 2])
@@ -547,18 +657,22 @@ pub fn draw_monitor_preview(
             let step = 20.0;
             let fade_margin = 60.0;
             let max_alpha = 18.0;
-            
+
             // Vertical lines
             let mut x = rect.left() - (rect.left() % step);
             while x < rect.right() {
                 if x >= rect.left() {
-                    let fade_x = ((x - rect.left()).min(rect.right() - x) / fade_margin).clamp(0.0, 1.0);
+                    let fade_x =
+                        ((x - rect.left()).min(rect.right() - x) / fade_margin).clamp(0.0, 1.0);
                     if fade_x > 0.0 {
                         let mut y = rect.top();
                         while y < rect.bottom() {
                             let next_y = (y + 10.0).min(rect.bottom());
-                            let fade_y1 = ((y - rect.top()).min(rect.bottom() - y) / fade_margin).clamp(0.0, 1.0);
-                            let fade_y2 = ((next_y - rect.top()).min(rect.bottom() - next_y) / fade_margin).clamp(0.0, 1.0);
+                            let fade_y1 = ((y - rect.top()).min(rect.bottom() - y) / fade_margin)
+                                .clamp(0.0, 1.0);
+                            let fade_y2 = ((next_y - rect.top()).min(rect.bottom() - next_y)
+                                / fade_margin)
+                                .clamp(0.0, 1.0);
                             let alpha = (fade_x * (fade_y1 + fade_y2) * 0.5 * max_alpha) as u8;
                             if alpha > 0 {
                                 let color = if app.dark_mode {
@@ -566,7 +680,10 @@ pub fn draw_monitor_preview(
                                 } else {
                                     egui::Color32::from_black_alpha(alpha)
                                 };
-                                painter.line_segment([egui::pos2(x, y), egui::pos2(x, next_y)], egui::Stroke::new(1.0, color));
+                                painter.line_segment(
+                                    [egui::pos2(x, y), egui::pos2(x, next_y)],
+                                    egui::Stroke::new(1.0, color),
+                                );
                             }
                             y = next_y;
                         }
@@ -574,18 +691,22 @@ pub fn draw_monitor_preview(
                 }
                 x += step;
             }
-            
+
             // Horizontal lines
             let mut y = rect.top() - (rect.top() % step);
             while y < rect.bottom() {
                 if y >= rect.top() {
-                    let fade_y = ((y - rect.top()).min(rect.bottom() - y) / fade_margin).clamp(0.0, 1.0);
+                    let fade_y =
+                        ((y - rect.top()).min(rect.bottom() - y) / fade_margin).clamp(0.0, 1.0);
                     if fade_y > 0.0 {
                         let mut x = rect.left();
                         while x < rect.right() {
                             let next_x = (x + 10.0).min(rect.right());
-                            let fade_x1 = ((x - rect.left()).min(rect.right() - x) / fade_margin).clamp(0.0, 1.0);
-                            let fade_x2 = ((next_x - rect.left()).min(rect.right() - next_x) / fade_margin).clamp(0.0, 1.0);
+                            let fade_x1 = ((x - rect.left()).min(rect.right() - x) / fade_margin)
+                                .clamp(0.0, 1.0);
+                            let fade_x2 = ((next_x - rect.left()).min(rect.right() - next_x)
+                                / fade_margin)
+                                .clamp(0.0, 1.0);
                             let alpha = (fade_y * (fade_x1 + fade_x2) * 0.5 * max_alpha) as u8;
                             if alpha > 0 {
                                 let color = if app.dark_mode {
@@ -593,7 +714,10 @@ pub fn draw_monitor_preview(
                                 } else {
                                     egui::Color32::from_black_alpha(alpha)
                                 };
-                                painter.line_segment([egui::pos2(x, y), egui::pos2(next_x, y)], egui::Stroke::new(1.0, color));
+                                painter.line_segment(
+                                    [egui::pos2(x, y), egui::pos2(next_x, y)],
+                                    egui::Stroke::new(1.0, color),
+                                );
                             }
                             x = next_x;
                         }

@@ -1,7 +1,6 @@
 use windows::Win32::Graphics::Gdi::{
     DISPLAY_DEVICE_STATE_FLAGS, DISPLAY_DEVICEW, EnumDisplayDevicesW,
 };
-use windows::core::BOOL;
 use windows::core::PCWSTR;
 
 #[test]

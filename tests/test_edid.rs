@@ -10,7 +10,8 @@ fn test_query_display_config() {
     unsafe {
         let mut path_count = 0;
         let mut mode_count = 0;
-        if GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &mut path_count, &mut mode_count) != 0
+        if GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &mut path_count, &mut mode_count)
+            != windows::Win32::Foundation::WIN32_ERROR(0)
         {
             return;
         }
@@ -25,7 +26,7 @@ fn test_query_display_config() {
             &mut mode_count,
             modes.as_mut_ptr(),
             None,
-        ) != 0
+        ) != windows::Win32::Foundation::WIN32_ERROR(0)
         {
             return;
         }

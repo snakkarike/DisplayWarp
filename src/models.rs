@@ -109,10 +109,13 @@ fn default_watcher_interval() -> u64 {
 
 // ─── Runtime State ───────────────────────────────────────────────────────────
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct MonitorInfo {
     pub rect: RECT,
     pub device_name: String,
+    pub hardware_name: Option<String>,
+    pub target_id: Option<u32>,
+    pub is_active: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

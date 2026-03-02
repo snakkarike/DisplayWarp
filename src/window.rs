@@ -159,7 +159,7 @@ unsafe extern "system" fn enum_window_by_name_callback(hwnd: HWND, lparam: LPARA
                 let exe_name = full_path
                     .trim_matches('\0')
                     .split(['/', '\\'])
-                    .last()
+                    .next_back()
                     .unwrap_or("")
                     .to_string();
 
@@ -475,7 +475,10 @@ unsafe extern "system" fn enum_visible_windows_callback(hwnd: HWND, lparam: LPAR
                 if !full.is_empty() {
                     exe_path = Some(std::path::PathBuf::from(full));
                 }
-                full.split(['/', '\\']).last().unwrap_or("").to_string()
+                full.split(['/', '\\'])
+                    .next_back()
+                    .unwrap_or("")
+                    .to_string()
             } else {
                 format!("PID {pid}")
             };

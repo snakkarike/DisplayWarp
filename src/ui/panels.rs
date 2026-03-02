@@ -729,15 +729,41 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             },
         ))
         .show(ui, |ui| {
-            ui.set_width(ui.available_width());
+            ui.set_min_width(ui.available_width());
             ui.label(egui::RichText::new(format!("{} Window Process", regular::FILE)).strong());
             ui.add_space(4.0);
-            ui.add(
-                egui::TextEdit::multiline(&mut app.new_profile_window_process)
-                    .hint_text("e.g. Diablo IV.exe - Leave blank if not needed.")
-                    .desired_width(ui.available_width())
-                    .desired_rows(2),
-            );
+            ui.horizontal(|ui| {
+                if app.new_profile_window_process.is_empty() {
+                    ui.label(
+                        egui::RichText::new("None selected")
+                            .color(egui::Color32::GRAY)
+                            .strong(),
+                    );
+                } else {
+                    let shown = truncate_text(&app.new_profile_window_process, 25);
+                    ui.label(egui::RichText::new(shown).color(egui::Color32::LIGHT_BLUE));
+                }
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .button(egui::RichText::new("Select EXE").strong())
+                        .clicked()
+                    {
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("Executable", &["exe"])
+                            .pick_file()
+                        {
+                            app.new_profile_window_process =
+                                path.file_name().unwrap().to_string_lossy().into_owned();
+                        }
+                    }
+                    if !app.new_profile_window_process.is_empty() {
+                        if ui.button(format!("{} Clear", regular::X)).clicked() {
+                            app.new_profile_window_process.clear();
+                        }
+                    }
+                });
+            });
         });
 
     ui.add_space(2.0);
@@ -881,18 +907,16 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                 .size(14.0)
                 .strong(),
         );
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui
-                .add(egui::Button::new(format!(
-                    "{} Refresh",
-                    regular::ARROW_CLOCKWISE
-                )))
-                .clicked()
-            {
-                app.refresh_live_processes();
-            }
-        });
     });
+    ui.label(
+        egui::RichText::new("Easily move an open application to a specific monitor.")
+            .small()
+            .color(if app.dark_mode {
+                egui::Color32::from_gray(140)
+            } else {
+                egui::Color32::from_gray(100)
+            }),
+    );
 
     ui.add_space(4.0);
 
@@ -1063,6 +1087,19 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             }
         }
     });
+    ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+        let width = ui.available_width();
+
+        if ui
+            .add_sized(
+                [width, 30.0], // 40.0 = height, adjust if needed
+                egui::Button::new(format!("{} Refresh", regular::ARROW_CLOCKWISE)),
+            )
+            .clicked()
+        {
+            app.refresh_live_processes();
+        }
+    });
 }
 
 // ─── Status / Log Bar ────────────────────────────────────────────────────────
@@ -1165,11 +1202,22 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                             .size(16.0)
                             .strong(),
                     );
+                    ui.label(
+                        egui::RichText::new(
+                            "Drag and drop monitors to match your physical layout.",
+                        )
+                        .small()
+                        .color(if app.dark_mode {
+                            egui::Color32::from_gray(140)
+                        } else {
+                            egui::Color32::from_gray(100)
+                        }),
+                    );
                     ui.add_space(8.0);
 
                     // Interactive Dragging Canvas
                     let (response, painter) = ui.allocate_painter(
-                        egui::vec2(ui.available_width(), col_height - 145.0),
+                        egui::vec2(ui.available_width(), col_height - 280.0),
                         egui::Sense::drag(),
                     );
                     let rect = response.rect;
@@ -1394,6 +1442,13 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                         };
 
                         painter.rect_filled(m_rect, 4.0, fill);
+                        painter.text(
+                            m_rect.center(),
+                            egui::Align2::CENTER_CENTER,
+                            format!("Monitor {}", i + 1).to_owned(),
+                            egui::FontId::proportional(14.0),
+                            egui::Color32::WHITE,
+                        );
                         painter.rect_stroke(
                             m_rect,
                             egui::CornerRadius::same(4),
@@ -1402,19 +1457,122 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                         );
 
                         painter.text(
-                            m_rect.center(),
-                            egui::Align2::CENTER_CENTER,
-                            format!("Monitor {}", i + 1).to_owned(),
-                            egui::FontId::proportional(14.0),
-                            egui::Color32::WHITE,
-                        );
-                        painter.text(
                             m_rect.left_top() + egui::vec2(6.0, 6.0),
                             egui::Align2::LEFT_TOP,
                             format!("{}, {}", m.rect.left, m.rect.top).to_owned(),
                             egui::FontId::proportional(10.0),
                             egui::Color32::from_white_alpha(150),
                         );
+                    }
+
+                    ui.add_space(12.0);
+                    ui.separator();
+                    ui.add_space(8.0);
+
+                    // Display Topology Controls
+                    ui.label(egui::RichText::new("Display Topology").strong());
+                    ui.label(
+                        egui::RichText::new(
+                            "Quickly change how Windows handles your displays per monitor.",
+                        )
+                        .small()
+                        .color(if app.dark_mode {
+                            egui::Color32::from_gray(140)
+                        } else {
+                            egui::Color32::from_gray(100)
+                        }),
+                    );
+                    ui.add_space(8.0);
+
+                    let display_targets = app.display_targets.clone();
+                    for m in &display_targets {
+                        ui.horizontal(|ui| {
+                            let (status_icon, status_color) = if m.is_active {
+                                (regular::CHECK_CIRCLE, egui::Color32::LIGHT_GREEN)
+                            } else {
+                                (regular::X_CIRCLE, egui::Color32::GRAY)
+                            };
+
+                            ui.label(egui::RichText::new(status_icon).color(status_color));
+
+                            let mut name = m
+                                .hardware_name
+                                .clone()
+                                .unwrap_or_else(|| m.device_name.clone());
+                            if name.is_empty() {
+                                name = "Unknown Display".to_string();
+                            }
+                            ui.label(egui::RichText::new(truncate_text(&name, 25)).strong());
+
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    if let Some(target_id) = m.target_id {
+                                        if ui
+                                            .button(format!("{} Disconnect", regular::POWER))
+                                            .clicked()
+                                        {
+                                            crate::monitor::set_monitor_state(
+                                                target_id,
+                                                "Disconnect",
+                                            );
+                                            WindowManagerApp::push_status(
+                                                &app.status_message,
+                                                &app.status_log,
+                                                format!("🔌 Disconnected {}.", name),
+                                            );
+                                            app.refresh_monitors();
+                                        }
+                                        if ui
+                                            .button(format!("{} Duplicate", regular::COPY))
+                                            .clicked()
+                                        {
+                                            crate::monitor::set_monitor_state(
+                                                target_id,
+                                                "Duplicate",
+                                            );
+                                            WindowManagerApp::push_status(
+                                                &app.status_message,
+                                                &app.status_log,
+                                                format!("👯 Duplicated {}.", name),
+                                            );
+                                            app.refresh_monitors();
+                                        }
+                                        if ui
+                                            .button(format!(
+                                                "{} Extend",
+                                                regular::ARROWS_OUT_LINE_HORIZONTAL
+                                            ))
+                                            .clicked()
+                                        {
+                                            crate::monitor::set_monitor_state(target_id, "Extend");
+                                            WindowManagerApp::push_status(
+                                                &app.status_message,
+                                                &app.status_log,
+                                                format!("🖥️ Extended {}.", name),
+                                            );
+                                            app.refresh_monitors();
+                                        }
+                                        if ui
+                                            .button(format!("{} Reconnect", regular::PLUG))
+                                            .clicked()
+                                        {
+                                            crate::monitor::set_monitor_state(
+                                                target_id,
+                                                "Reconnect",
+                                            );
+                                            WindowManagerApp::push_status(
+                                                &app.status_message,
+                                                &app.status_log,
+                                                format!("🔌 Reconnected {}.", name),
+                                            );
+                                            app.refresh_monitors();
+                                        }
+                                    }
+                                },
+                            );
+                        });
+                        ui.add_space(4.0);
                     }
 
                     ui.add_space(12.0);
@@ -1435,36 +1593,35 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                                 egui::Button::new(format!("{} Save", regular::FLOPPY_DISK)),
                             )
                             .clicked()
+                            && !app.new_display_profile_name.is_empty()
                         {
-                            if !app.new_display_profile_name.is_empty() {
-                                let monitors_snapshot = app
-                                    .monitors
-                                    .iter()
-                                    .map(|m| crate::models::SavedMonitorPos {
-                                        device_name: m.device_name.clone(),
-                                        rect: crate::models::SerializableRect {
-                                            left: m.rect.left,
-                                            top: m.rect.top,
-                                            right: m.rect.right,
-                                            bottom: m.rect.bottom,
-                                        },
-                                    })
-                                    .collect();
-
-                                app.data.lock().display_profiles.push(
-                                    crate::models::SavedDisplayLayout {
-                                        name: app.new_display_profile_name.clone(),
-                                        monitors: monitors_snapshot,
+                            let monitors_snapshot = app
+                                .monitors
+                                .iter()
+                                .map(|m| crate::models::SavedMonitorPos {
+                                    device_name: m.device_name.clone(),
+                                    rect: crate::models::SerializableRect {
+                                        left: m.rect.left,
+                                        top: m.rect.top,
+                                        right: m.rect.right,
+                                        bottom: m.rect.bottom,
                                     },
-                                );
-                                app.new_display_profile_name.clear();
-                                app.save_data();
-                                WindowManagerApp::push_status(
-                                    &app.status_message,
-                                    &app.status_log,
-                                    "✅ Display layout saved.",
-                                );
-                            }
+                                })
+                                .collect();
+
+                            app.data.lock().display_profiles.push(
+                                crate::models::SavedDisplayLayout {
+                                    name: app.new_display_profile_name.clone(),
+                                    monitors: monitors_snapshot,
+                                },
+                            );
+                            app.new_display_profile_name.clear();
+                            app.save_data();
+                            WindowManagerApp::push_status(
+                                &app.status_message,
+                                &app.status_log,
+                                "✅ Display layout saved.",
+                            );
                         }
                     });
                 });
@@ -1498,6 +1655,15 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                         egui::RichText::new(format!("{} Saved Profiles", regular::BOOKMARK_SIMPLE))
                             .size(16.0)
                             .strong(),
+                    );
+                    ui.label(
+                        egui::RichText::new("Quickly restore a saved multi-monitor layout.")
+                            .small()
+                            .color(if app.dark_mode {
+                                egui::Color32::from_gray(140)
+                            } else {
+                                egui::Color32::from_gray(100)
+                            }),
                     );
                     ui.add_space(8.0);
 
