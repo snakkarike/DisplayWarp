@@ -46,6 +46,7 @@ pub struct WindowManagerApp {
     // ── Display Profile state ──
     pub new_display_profile_name: String,
     pub dragging_monitor_idx: Option<usize>,
+    pub selected_display_idx: Option<usize>,
     pub drag_start_pos: Option<egui::Pos2>,
     pub original_monitor_rect: Option<windows::Win32::Foundation::RECT>,
 
@@ -94,6 +95,7 @@ impl Default for WindowManagerApp {
             live_move_mon_idx: 0,
             new_display_profile_name: String::new(),
             dragging_monitor_idx: None,
+            selected_display_idx: None,
             drag_start_pos: None,
             original_monitor_rect: None,
 

@@ -291,12 +291,24 @@ pub fn restore_monitor_layout(snapshot: &[SavedMonitorPos]) {
 }
 
 use windows::Win32::Devices::Display::{
-    SDC_APPLY, SDC_SAVE_TO_DATABASE, SDC_USE_SUPPLIED_DISPLAY_CONFIG, SetDisplayConfig,
+    SDC_ALLOW_CHANGES, SDC_APPLY, SDC_SAVE_TO_DATABASE, SDC_USE_SUPPLIED_DISPLAY_CONFIG,
+    SetDisplayConfig,
 };
 
 /// Set the state of a specific monitor by Target ID.
 /// `state` can be "Extend", "Duplicate", or "Disconnect".
 pub fn set_monitor_state(target_id: u32, state: &str) {
+    // If state is "Duplicate", it expects the format "DuplicateWith:{other_target_id}"
+    let mut other_target_id: Option<u32> = None;
+    let final_state = if state.starts_with("DuplicateWith:") {
+        if let Ok(tid) = state.trim_start_matches("DuplicateWith:").parse::<u32>() {
+            other_target_id = Some(tid);
+        }
+        "Duplicate"
+    } else {
+        state
+    };
+
     unsafe {
         let mut path_count = 0;
         let mut mode_count = 0;
@@ -306,11 +318,141 @@ pub fn set_monitor_state(target_id: u32, state: &str) {
             return;
         }
 
+        let mut all_paths = vec![DISPLAYCONFIG_PATH_INFO::default(); path_count as usize];
+        let mut all_modes = vec![DISPLAYCONFIG_MODE_INFO::default(); mode_count as usize];
+
+        if QueryDisplayConfig(
+            QDC_ALL_PATHS,
+            &mut path_count,
+            all_paths.as_mut_ptr(),
+            &mut mode_count,
+            all_modes.as_mut_ptr(),
+            None,
+        ) != windows::Win32::Foundation::WIN32_ERROR(0)
+        {
+            return;
+        }
+
+        // 1. Identify currently active paths
+        let mut active_paths: Vec<DISPLAYCONFIG_PATH_INFO> = all_paths
+            .iter()
+            .take(path_count as usize)
+            .filter(|p| (p.flags & 1) != 0)
+            .cloned()
+            .collect();
+
+        let mut modified = false;
+
+        match final_state {
+            "Disconnect" => {
+                let initial_len = active_paths.len();
+                active_paths.retain(|p| p.targetInfo.id != target_id);
+                if active_paths.len() != initial_len {
+                    modified = true;
+                }
+            }
+            "Extend" | "Reconnect" => {
+                // Check if already active
+                if !active_paths.iter().any(|p| p.targetInfo.id == target_id) {
+                    // Find a suitable path in the full list
+                    if let Some(mut path) = all_paths
+                        .iter()
+                        .take(path_count as usize)
+                        .find(|p| p.targetInfo.id == target_id)
+                        .cloned()
+                    {
+                        path.flags |= 1; // Mark active
+
+                        // Ensure source ID doesn't conflict
+                        let adapter_id = path.targetInfo.adapterId.LowPart;
+                        let mut used_sources = std::collections::HashSet::new();
+                        for ap in &active_paths {
+                            if ap.targetInfo.adapterId.LowPart == adapter_id {
+                                used_sources.insert(ap.sourceInfo.id);
+                            }
+                        }
+
+                        if used_sources.contains(&path.sourceInfo.id) {
+                            let mut new_source = 0;
+                            while used_sources.contains(&new_source) {
+                                new_source += 1;
+                            }
+                            path.sourceInfo.id = new_source;
+                        }
+
+                        active_paths.push(path);
+                        modified = true;
+                    }
+                }
+            }
+            "Duplicate" => {
+                // Find source of the other monitor
+                let source_to_clone = if let Some(other_tid) = other_target_id {
+                    active_paths
+                        .iter()
+                        .find(|p| p.targetInfo.id == other_tid)
+                        .map(|p| (p.targetInfo.adapterId, p.sourceInfo.id))
+                } else {
+                    active_paths
+                        .first()
+                        .map(|p| (p.targetInfo.adapterId, p.sourceInfo.id))
+                };
+
+                if let Some((adapter_id, source_id)) = source_to_clone {
+                    // Remove existing path for target_id if it exists
+                    active_paths.retain(|p| p.targetInfo.id != target_id);
+                    // Find it in the master list and clone the source
+                    if let Some(mut path) = all_paths
+                        .iter()
+                        .take(path_count as usize)
+                        .find(|p| p.targetInfo.id == target_id)
+                        .cloned()
+                    {
+                        path.flags |= 1;
+                        path.targetInfo.adapterId = adapter_id;
+                        path.sourceInfo.id = source_id;
+                        active_paths.push(path);
+                        modified = true;
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        if modified {
+            // Reset mode indices for all paths to ensure a clean negotiation
+            for p in &mut active_paths {
+                p.sourceInfo.Anonymous.modeInfoIdx = 0xFFFFFFFF;
+                p.targetInfo.Anonymous.modeInfoIdx = 0xFFFFFFFF;
+            }
+
+            let _ = SetDisplayConfig(
+                Some(&active_paths),
+                None, // We let Windows negotiate modes
+                SDC_APPLY
+                    | SDC_USE_SUPPLIED_DISPLAY_CONFIG
+                    | SDC_SAVE_TO_DATABASE
+                    | SDC_ALLOW_CHANGES,
+            );
+        }
+    }
+}
+
+pub fn set_primary_monitor(target_id: u32) {
+    unsafe {
+        let mut path_count = 0;
+        let mut mode_count = 0;
+        if GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &mut path_count, &mut mode_count)
+            != windows::Win32::Foundation::WIN32_ERROR(0)
+        {
+            return;
+        }
+
         let mut paths = vec![DISPLAYCONFIG_PATH_INFO::default(); path_count as usize];
         let mut modes = vec![DISPLAYCONFIG_MODE_INFO::default(); mode_count as usize];
 
         if QueryDisplayConfig(
-            QDC_ALL_PATHS,
+            QDC_ONLY_ACTIVE_PATHS,
             &mut path_count,
             paths.as_mut_ptr(),
             &mut mode_count,
@@ -321,95 +463,51 @@ pub fn set_monitor_state(target_id: u32, state: &str) {
             return;
         }
 
-        let mut modified = false;
+        // Adjust sizes to actual returned count
+        paths.truncate(path_count as usize);
 
-        match state {
-            "Disconnect" => {
-                for path in paths.iter_mut().take(path_count as usize) {
-                    if path.targetInfo.id == target_id {
-                        println!(
-                            "DEBUG: Found path for target_id {} to disconnect. Flags before: {:x}",
-                            target_id, path.flags
-                        );
-                        path.flags &= !1; // Clear DISPLAYCONFIG_PATH_ACTIVE
-                        modified = true;
+        // Find the index of the path we want to be primary
+        if let Some(target_idx) = paths.iter().position(|p| p.targetInfo.id == target_id) {
+            let target_source_idx = paths[target_idx].sourceInfo.Anonymous.modeInfoIdx;
+
+            // If the structure provides mode details, we must recalculate origins
+            if target_source_idx < mode_count {
+                let offset_x = modes[target_source_idx as usize]
+                    .Anonymous
+                    .sourceMode
+                    .position
+                    .x;
+                let offset_y = modes[target_source_idx as usize]
+                    .Anonymous
+                    .sourceMode
+                    .position
+                    .y;
+
+                for mode in &mut modes {
+                    if mode.infoType
+                        == windows::Win32::Devices::Display::DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE
+                    {
+                        mode.Anonymous.sourceMode.position.x -= offset_x;
+                        mode.Anonymous.sourceMode.position.y -= offset_y;
                     }
                 }
             }
-            "Extend" | "Reconnect" => {
-                // Determine a free source ID
-                let mut used_sources = std::collections::HashSet::new();
-                for path in paths.iter().take(path_count as usize) {
-                    if (path.flags & 1) != 0 {
-                        used_sources.insert(path.sourceInfo.id);
-                    }
-                }
 
-                for path in paths.iter_mut().take(path_count as usize) {
-                    if path.targetInfo.id == target_id {
-                        println!(
-                            "DEBUG: Found path for target_id {} to reconnect. Flags before: {:x}",
-                            target_id, path.flags
-                        );
-                        if (path.flags & 1) == 0 {
-                            path.flags |= 1; // Set DISPLAYCONFIG_PATH_ACTIVE
-                            // If this path was inactive, we should ideally assign a new source ID if the current one is in use
-                            if used_sources.contains(&path.sourceInfo.id) {
-                                // Find a free source ID (simple approach: just find max used + 1)
-                                let new_source = used_sources.iter().max().unwrap_or(&0) + 1;
-                                println!(
-                                    "DEBUG: Source ID {} in use, assigning new_source: {}",
-                                    path.sourceInfo.id, new_source
-                                );
-                                path.sourceInfo.id = new_source;
-                                used_sources.insert(new_source);
-                            }
-                            modified = true;
-                        } else {
-                            println!("DEBUG: Path already active, skipping modification.");
-                        }
-                    }
-                }
+            // Windows implicitly treats the path at index 0 as the primary display.
+            // Move the target path to index 0.
+            if target_idx != 0 {
+                paths.swap(0, target_idx);
             }
-            "Duplicate" => {
-                // Find the primary monitor's source ID (usually active and associated with a primary GDI device, or just the first active)
-                let mut primary_source_id = None;
-                for path in paths.iter().take(path_count as usize) {
-                    if (path.flags & 1) != 0 && path.targetInfo.id != target_id {
-                        primary_source_id = Some(path.sourceInfo.id);
-                        break;
-                    }
-                }
 
-                if let Some(src_id) = primary_source_id {
-                    for path in paths.iter_mut().take(path_count as usize) {
-                        if path.targetInfo.id == target_id {
-                            path.flags |= 1; // Set active
-                            path.sourceInfo.id = src_id; // Clone source
-                            modified = true;
-                        }
-                    }
-                }
-            }
-            _ => return,
-        }
-
-        if modified {
-            let flags = SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_SAVE_TO_DATABASE;
-            println!(
-                "Applying SetDisplayConfig with {} paths, {} modes",
-                path_count, mode_count
+            // Apply
+            let _ = SetDisplayConfig(
+                Some(&paths),
+                Some(&modes),
+                SDC_APPLY
+                    | SDC_USE_SUPPLIED_DISPLAY_CONFIG
+                    | SDC_SAVE_TO_DATABASE
+                    | SDC_ALLOW_CHANGES,
             );
-            let result = SetDisplayConfig(
-                Some(&mut paths[..path_count as usize]),
-                Some(&mut modes[..mode_count as usize]),
-                flags,
-            );
-            if result != 0 {
-                eprintln!("DEBUG: SetDisplayConfig FAILED with error code: {}", result);
-            } else {
-                println!("DEBUG: SetDisplayConfig succeeded.");
-            }
         }
     }
 }
