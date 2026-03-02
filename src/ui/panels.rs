@@ -79,10 +79,16 @@ fn draw_profile_card(
             ui.vertical(|ui| {
                 ui.label(egui::RichText::new(&p.name).strong().size(13.0));
                 ui.horizontal_wrapped(|ui| {
-                    let raw_mon = p
-                        .target_monitor_name
-                        .replace("\\\\.\\", "")
-                        .replace("DISPLAY", "Display ");
+                    let hardware_name = app
+                        .display_targets
+                        .iter()
+                        .find(|t| t.device_name == p.target_monitor_name)
+                        .and_then(|t| t.hardware_name.clone())
+                        .unwrap_or_else(|| {
+                            p.target_monitor_name
+                                .replace("\\\\.\\", "")
+                                .replace("DISPLAY", "Display ")
+                        });
 
                     // Monitor Badge
                     egui::Frame::NONE
@@ -94,8 +100,11 @@ fn draw_profile_card(
                         .inner_margin(egui::Margin::symmetric(6, 2))
                         .corner_radius(egui::CornerRadius::same(6))
                         .show(ui, |ui| {
-                            let badge_text =
-                                format!("{} {}", regular::MONITOR, truncate_text(&raw_mon, 15));
+                            let badge_text = format!(
+                                "{} {}",
+                                regular::MONITOR,
+                                truncate_text(&hardware_name, 15)
+                            );
                             ui.label(egui::RichText::new(badge_text).small().color(
                                 if app.dark_mode {
                                     egui::Color32::from_rgb(150, 200, 255)
@@ -380,14 +389,20 @@ fn draw_edit_profile_form(
                             for (mi, m) in app.monitors.iter().enumerate() {
                                 let w = m.rect.right - m.rect.left;
                                 let h = m.rect.bottom - m.rect.top;
-                                let clean_name = m
-                                    .device_name
-                                    .replace("\\\\.\\", "")
-                                    .replace("DISPLAY", "Display ");
+                                let hardware_name = app
+                                    .display_targets
+                                    .iter()
+                                    .find(|t| t.device_name == m.device_name)
+                                    .and_then(|t| t.hardware_name.clone())
+                                    .unwrap_or_else(|| {
+                                        m.device_name
+                                            .replace("\\\\.\\", "")
+                                            .replace("DISPLAY", "Display ")
+                                    });
                                 ui.selectable_value(
                                     &mut app.edit_profile_mon_idx,
                                     mi,
-                                    format!("Monitor {} ({}) ({}×{})", mi + 1, clean_name, w, h),
+                                    format!("Monitor {} ({}) ({}×{})", mi + 1, hardware_name, w, h),
                                 );
                             }
                         });
@@ -697,14 +712,20 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                     for (i, m) in app.monitors.iter().enumerate() {
                         let w = m.rect.right - m.rect.left;
                         let h = m.rect.bottom - m.rect.top;
-                        let clean_name = m
-                            .device_name
-                            .replace("\\\\.\\", "")
-                            .replace("DISPLAY", "Display ");
+                        let hardware_name = app
+                            .display_targets
+                            .iter()
+                            .find(|t| t.device_name == m.device_name)
+                            .and_then(|t| t.hardware_name.clone())
+                            .unwrap_or_else(|| {
+                                m.device_name
+                                    .replace("\\\\.\\", "")
+                                    .replace("DISPLAY", "Display ")
+                            });
                         ui.selectable_value(
                             &mut app.selected_mon_idx,
                             i,
-                            format!("Monitor {} ({}) ({}×{})", i + 1, clean_name, w, h),
+                            format!("Monitor {} ({}) ({}×{})", i + 1, hardware_name, w, h),
                         );
                     }
                 });
@@ -1001,14 +1022,20 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                     for (i, m) in app.monitors.iter().enumerate() {
                         let w = m.rect.right - m.rect.left;
                         let h = m.rect.bottom - m.rect.top;
-                        let clean_name = m
-                            .device_name
-                            .replace("\\\\.\\", "")
-                            .replace("DISPLAY", "Display ");
+                        let hardware_name = app
+                            .display_targets
+                            .iter()
+                            .find(|t| t.device_name == m.device_name)
+                            .and_then(|t| t.hardware_name.clone())
+                            .unwrap_or_else(|| {
+                                m.device_name
+                                    .replace("\\\\.\\", "")
+                                    .replace("DISPLAY", "Display ")
+                            });
                         ui.selectable_value(
                             &mut app.live_move_mon_idx,
                             i,
-                            format!("Monitor {} ({}) ({}×{})", i + 1, clean_name, w, h),
+                            format!("Monitor {} ({}) ({}×{})", i + 1, hardware_name, w, h),
                         );
                     }
                 });
@@ -1198,22 +1225,36 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                 .show(ui, |ui| {
                     ui.set_width(ui.available_width());
 
-                    ui.label(
-                        egui::RichText::new(format!("{} Arrange Monitors", regular::CROP))
-                            .size(16.0)
-                            .strong(),
-                    );
-                    ui.label(
-                        egui::RichText::new(
-                            "Drag and drop monitors to match your physical layout.",
-                        )
-                        .small()
-                        .color(if app.dark_mode {
-                            egui::Color32::from_gray(140)
-                        } else {
-                            egui::Color32::from_gray(100)
-                        }),
-                    );
+                    ui.horizontal(|ui| {
+                        ui.vertical(|ui| {
+                            ui.label(
+                                egui::RichText::new(format!("{} Arrange Monitors", regular::CROP))
+                                    .size(16.0)
+                                    .strong(),
+                            );
+                            ui.label(
+                                egui::RichText::new(
+                                    "Drag and drop monitors to match your physical layout.",
+                                )
+                                .small()
+                                .color(if app.dark_mode {
+                                    egui::Color32::from_gray(140)
+                                } else {
+                                    egui::Color32::from_gray(100)
+                                }),
+                            );
+                        });
+
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                            if ui
+                                .button(format!("{} Refresh", regular::ARROWS_CLOCKWISE))
+                                .on_hover_text("Redetect monitors and their current layout")
+                                .clicked()
+                            {
+                                app.refresh_monitors();
+                            }
+                        });
+                    });
                     ui.add_space(8.0);
 
                     // Interactive Dragging Canvas
@@ -1479,7 +1520,13 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                             app.selected_display_idx = Some(first_idx);
                         }
 
-                        let fill = if !is_active {
+                        let fill = if is_selected {
+                            if app.dark_mode {
+                                egui::Color32::from_rgb(22, 163, 74)
+                            } else {
+                                egui::Color32::from_rgb(74, 222, 128)
+                            }
+                        } else if !is_active {
                             if app.dark_mode {
                                 egui::Color32::from_rgb(40, 44, 52)
                             } else {
@@ -1505,14 +1552,28 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                             painter.rect_stroke(
                                 m_rect.expand(2.0),
                                 egui::CornerRadius::same(6),
-                                egui::Stroke::new(2.5, egui::Color32::WHITE),
+                                egui::Stroke::new(
+                                    2.5,
+                                    if app.dark_mode {
+                                        egui::Color32::WHITE
+                                    } else {
+                                        egui::Color32::BLACK
+                                    },
+                                ),
                                 egui::StrokeKind::Outside,
                             );
                         } else {
                             painter.rect_stroke(
                                 m_rect,
                                 egui::CornerRadius::same(4),
-                                egui::Stroke::new(1.5, egui::Color32::from_white_alpha(40)),
+                                egui::Stroke::new(
+                                    1.5,
+                                    if app.dark_mode {
+                                        egui::Color32::from_white_alpha(40)
+                                    } else {
+                                        egui::Color32::from_black_alpha(40)
+                                    },
+                                ),
                                 egui::StrokeKind::Middle,
                             );
                         }
@@ -1687,10 +1748,18 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                         }) {
                             egui::Frame::group(ui.style())
                                 .fill(if app.dark_mode {
-                                    egui::Color32::from_rgb(15, 23, 42)
+                                    egui::Color32::from_rgb(34, 34, 34)
                                 } else {
-                                    egui::Color32::from_rgb(255, 255, 255)
+                                    egui::Color32::from_rgb(241, 245, 249)
                                 })
+                                .stroke(egui::Stroke::new(
+                                    1.0,
+                                    if app.dark_mode {
+                                        egui::Color32::from_rgb(50, 50, 50)
+                                    } else {
+                                        egui::Color32::from_rgb(226, 232, 240)
+                                    },
+                                ))
                                 .show(ui, |ui| {
                                     ui.set_width(ui.available_width());
 
