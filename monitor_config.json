@@ -83,10 +83,10 @@
         {
           "device_name": "\\\\.\\DISPLAY2",
           "rect": {
-            "left": 12,
-            "top": 1449,
-            "right": 1932,
-            "bottom": 2529
+            "left": 0,
+            "top": 1440,
+            "right": 1920,
+            "bottom": 2520
           }
         },
         {
