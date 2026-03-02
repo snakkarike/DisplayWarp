@@ -77,22 +77,32 @@ fn draw_profile_card(
             // ── Header: name + display badge (Vertical layout for narrow columns) ──
             ui.vertical(|ui| {
                 ui.label(egui::RichText::new(&p.name).strong().size(13.0));
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     let raw_mon = p
                         .target_monitor_name
                         .replace("\\\\.\\", "")
                         .replace("DISPLAY", "Display ");
-                    let badge_text =
-                        format!("{} {}", regular::MONITOR, truncate_text(&raw_mon, 15));
-                    ui.label(
-                        egui::RichText::new(badge_text)
-                            .small()
-                            .color(if app.dark_mode {
-                                egui::Color32::from_rgb(150, 200, 255)
-                            } else {
-                                egui::Color32::from_rgb(37, 99, 235)
-                            }),
-                    );
+
+                    // Monitor Badge
+                    egui::Frame::NONE
+                        .fill(if app.dark_mode {
+                            egui::Color32::from_rgb(40, 50, 70)
+                        } else {
+                            egui::Color32::from_rgb(220, 230, 255)
+                        })
+                        .inner_margin(egui::Margin::symmetric(6, 2))
+                        .corner_radius(egui::CornerRadius::same(6))
+                        .show(ui, |ui| {
+                            let badge_text =
+                                format!("{} {}", regular::MONITOR, truncate_text(&raw_mon, 15));
+                            ui.label(egui::RichText::new(badge_text).small().color(
+                                if app.dark_mode {
+                                    egui::Color32::from_rgb(150, 200, 255)
+                                } else {
+                                    egui::Color32::from_rgb(37, 99, 235)
+                                },
+                            ));
+                        });
 
                     if let Some(audio_id) = &p.target_audio_device_id {
                         let audio_name = app
@@ -102,17 +112,27 @@ fn draw_profile_card(
                             .map(|d| d.name.clone())
                             .unwrap_or_else(|| "Unknown Audio".to_string());
 
-                        let badge_text = format!(
-                            "{} {}",
-                            regular::SPEAKER_HIGH,
-                            truncate_text(&audio_name, 15)
-                        );
+                        egui::Frame::NONE
+                            .fill(if app.dark_mode {
+                                egui::Color32::from_rgb(50, 40, 70)
+                            } else {
+                                egui::Color32::from_rgb(240, 230, 255)
+                            })
+                            .inner_margin(egui::Margin::symmetric(6, 2))
+                            .corner_radius(egui::CornerRadius::same(6))
+                            .show(ui, |ui| {
+                                let badge_text = format!(
+                                    "{} {}",
+                                    regular::SPEAKER_HIGH,
+                                    truncate_text(&audio_name, 30)
+                                );
 
-                        ui.label(
-                            egui::RichText::new(badge_text)
-                                .small()
-                                .color(egui::Color32::from_rgb(167, 139, 250)),
-                        );
+                                ui.label(
+                                    egui::RichText::new(badge_text)
+                                        .small()
+                                        .color(egui::Color32::from_rgb(167, 139, 250)),
+                                );
+                            });
                     }
                 });
             });
