@@ -1679,7 +1679,12 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                     ui.add_space(8.0);
 
                     if let Some(selected_idx) = app.selected_display_idx {
-                        if let Some(selected_mon) = app.display_targets.get(selected_idx).cloned() {
+                        if let Some(selected_mon) = app.monitors.get(selected_idx).and_then(|m| {
+                            app.display_targets
+                                .iter()
+                                .find(|t| t.device_name == m.device_name)
+                                .cloned()
+                        }) {
                             egui::Frame::group(ui.style())
                                 .fill(if app.dark_mode {
                                     egui::Color32::from_rgb(15, 23, 42)
@@ -1835,7 +1840,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                     }
                 }); // End Monitor Settings
 
-            ui.add_space(16.0);
+            ui.add_space(4.0);
 
             // Saved Display Profiles List
             egui::Frame::group(ui.style())

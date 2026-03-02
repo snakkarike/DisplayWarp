@@ -121,23 +121,33 @@ impl eframe::App for WindowManagerApp {
             ui.horizontal(|ui| {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                     let logo_option = if self.dark_mode {
-                    &self.logo_texture_white
-                } else {
-                    &self.logo_texture
-                };
+                        &self.logo_texture_white
+                    } else {
+                        &self.logo_texture
+                    };
 
-                if let Some(tex) = logo_option {
-                    ui.image(egui::load::SizedTexture::new(
-                        tex.id(),
-                        egui::vec2(146.0, 22.0), // Scaled down slightly to fit inline natively
-                    ));
-                    ui.add_space(8.0);
-                }
+                    if let Some(tex) = logo_option {
+                        ui.image(egui::load::SizedTexture::new(
+                            tex.id(),
+                            egui::vec2(146.0, 22.0), // Scaled down slightly to fit inline natively
+                        ));
+                        ui.add_space(8.0);
+                    }
 
-                ui.selectable_value(&mut self.current_tab, AppTab::Warp, "Warp");
-                ui.selectable_value(&mut self.current_tab, AppTab::Display, "Display");
-                ui.selectable_value(&mut self.current_tab, AppTab::Log, "Log");
-                ui.selectable_value(&mut self.current_tab, AppTab::Settings, "Settings");
+                    // Apply purple color for active tab background
+                    ui.visuals_mut().selection.bg_fill = if self.dark_mode {
+                        egui::Color32::from_rgb(76, 29, 149)
+                    } else {
+                        egui::Color32::from_rgb(139, 92, 246)
+                    };
+
+                    // Force the active selection text color to white so it contrasts with the purple background
+                    ui.visuals_mut().selection.stroke.color = egui::Color32::WHITE;
+
+                    ui.selectable_value(&mut self.current_tab, AppTab::Warp, "Warp");
+                    ui.selectable_value(&mut self.current_tab, AppTab::Display, "Display");
+                    ui.selectable_value(&mut self.current_tab, AppTab::Log, "Log");
+                    ui.selectable_value(&mut self.current_tab, AppTab::Settings, "Settings");
                 });
             });
             ui.add_space(2.0);
