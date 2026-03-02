@@ -379,10 +379,14 @@ fn draw_edit_profile_form(
                             for (mi, m) in app.monitors.iter().enumerate() {
                                 let w = m.rect.right - m.rect.left;
                                 let h = m.rect.bottom - m.rect.top;
+                                let clean_name = m
+                                    .device_name
+                                    .replace("\\\\.\\", "")
+                                    .replace("DISPLAY", "Display ");
                                 ui.selectable_value(
                                     &mut app.edit_profile_mon_idx,
                                     mi,
-                                    format!("Monitor {} ({}×{})", mi + 1, w, h),
+                                    format!("Monitor {} ({}) ({}×{})", mi + 1, clean_name, w, h),
                                 );
                             }
                         });
@@ -692,10 +696,14 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                     for (i, m) in app.monitors.iter().enumerate() {
                         let w = m.rect.right - m.rect.left;
                         let h = m.rect.bottom - m.rect.top;
+                        let clean_name = m
+                            .device_name
+                            .replace("\\\\.\\", "")
+                            .replace("DISPLAY", "Display ");
                         ui.selectable_value(
                             &mut app.selected_mon_idx,
                             i,
-                            format!("Monitor {} ({}×{})", i + 1, w, h),
+                            format!("Monitor {} ({}) ({}×{})", i + 1, clean_name, w, h),
                         );
                     }
                 });
@@ -968,10 +976,14 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                     for (i, m) in app.monitors.iter().enumerate() {
                         let w = m.rect.right - m.rect.left;
                         let h = m.rect.bottom - m.rect.top;
+                        let clean_name = m
+                            .device_name
+                            .replace("\\\\.\\", "")
+                            .replace("DISPLAY", "Display ");
                         ui.selectable_value(
                             &mut app.live_move_mon_idx,
                             i,
-                            format!("Monitor {} ({}×{})", i + 1, w, h),
+                            format!("Monitor {} ({}) ({}×{})", i + 1, clean_name, w, h),
                         );
                     }
                 });
