@@ -154,6 +154,10 @@ pub fn get_all_display_targets() -> Vec<MonitorInfo> {
                 }
             }
 
+            if !is_active && friendly_name.is_empty() {
+                continue;
+            }
+
             targets.push(MonitorInfo {
                 rect: RECT::default(), // Not relevant for topology toggling
                 device_name,
@@ -323,6 +327,10 @@ pub fn set_monitor_state(target_id: u32, state: &str) {
             "Disconnect" => {
                 for path in paths.iter_mut().take(path_count as usize) {
                     if path.targetInfo.id == target_id {
+                        println!(
+                            "DEBUG: Found path for target_id {} to disconnect. Flags before: {:x}",
+                            target_id, path.flags
+                        );
                         path.flags &= !1; // Clear DISPLAYCONFIG_PATH_ACTIVE
                         modified = true;
                     }
@@ -339,16 +347,26 @@ pub fn set_monitor_state(target_id: u32, state: &str) {
 
                 for path in paths.iter_mut().take(path_count as usize) {
                     if path.targetInfo.id == target_id {
+                        println!(
+                            "DEBUG: Found path for target_id {} to reconnect. Flags before: {:x}",
+                            target_id, path.flags
+                        );
                         if (path.flags & 1) == 0 {
                             path.flags |= 1; // Set DISPLAYCONFIG_PATH_ACTIVE
                             // If this path was inactive, we should ideally assign a new source ID if the current one is in use
                             if used_sources.contains(&path.sourceInfo.id) {
                                 // Find a free source ID (simple approach: just find max used + 1)
                                 let new_source = used_sources.iter().max().unwrap_or(&0) + 1;
+                                println!(
+                                    "DEBUG: Source ID {} in use, assigning new_source: {}",
+                                    path.sourceInfo.id, new_source
+                                );
                                 path.sourceInfo.id = new_source;
                                 used_sources.insert(new_source);
                             }
                             modified = true;
+                        } else {
+                            println!("DEBUG: Path already active, skipping modification.");
                         }
                     }
                 }
@@ -378,11 +396,20 @@ pub fn set_monitor_state(target_id: u32, state: &str) {
 
         if modified {
             let flags = SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_SAVE_TO_DATABASE;
-            let _ = SetDisplayConfig(
+            println!(
+                "Applying SetDisplayConfig with {} paths, {} modes",
+                path_count, mode_count
+            );
+            let result = SetDisplayConfig(
                 Some(&mut paths[..path_count as usize]),
                 Some(&mut modes[..mode_count as usize]),
                 flags,
             );
+            if result != 0 {
+                eprintln!("DEBUG: SetDisplayConfig FAILED with error code: {}", result);
+            } else {
+                println!("DEBUG: SetDisplayConfig succeeded.");
+            }
         }
     }
 }

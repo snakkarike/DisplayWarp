@@ -1,17 +1,18 @@
 use windows::Win32::Devices::Display::{
     DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME, DISPLAYCONFIG_MODE_INFO, DISPLAYCONFIG_PATH_INFO,
     DISPLAYCONFIG_TARGET_DEVICE_NAME, DisplayConfigGetDeviceInfo, GetDisplayConfigBufferSizes,
-    QDC_ONLY_ACTIVE_PATHS, QueryDisplayConfig,
+    QDC_ALL_PATHS, QueryDisplayConfig,
 };
+use windows::Win32::Foundation::WIN32_ERROR;
 
-#[test]
-fn test_query_display_config() {
+fn main() {
     unsafe {
         let mut path_count = 0;
         let mut mode_count = 0;
-        if GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &mut path_count, &mut mode_count)
-            != windows::Win32::Foundation::WIN32_ERROR(0)
+        if GetDisplayConfigBufferSizes(QDC_ALL_PATHS, &mut path_count, &mut mode_count)
+            != WIN32_ERROR(0)
         {
+            println!("Failed to get buffer sizes");
             return;
         }
 
@@ -19,18 +20,25 @@ fn test_query_display_config() {
         let mut modes = vec![DISPLAYCONFIG_MODE_INFO::default(); mode_count as usize];
 
         if QueryDisplayConfig(
-            QDC_ONLY_ACTIVE_PATHS,
+            QDC_ALL_PATHS,
             &mut path_count,
             paths.as_mut_ptr(),
             &mut mode_count,
             modes.as_mut_ptr(),
             None,
-        ) != windows::Win32::Foundation::WIN32_ERROR(0)
+        ) != WIN32_ERROR(0)
         {
+            println!("Failed to query display config");
             return;
         }
 
-        for path in paths.iter().take(path_count as usize) {
+        println!("Found {} paths", path_count);
+
+        for (i, path) in paths.iter().take(path_count as usize).enumerate() {
+            let active = (path.flags & 1) != 0;
+            // The first bit of targetInfo.Anonymous.Anonymous._bitfield is targetAvailable
+            let target_available = (path.targetInfo.Anonymous.Anonymous._bitfield & 1) != 0;
+
             let mut target_name = DISPLAYCONFIG_TARGET_DEVICE_NAME::default();
             target_name.header.r#type = DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME;
             target_name.header.size =
@@ -38,19 +46,22 @@ fn test_query_display_config() {
             target_name.header.adapterId = path.targetInfo.adapterId;
             target_name.header.id = path.targetInfo.id;
 
+            let mut friendly_name = "Unknown".to_string();
             if DisplayConfigGetDeviceInfo(&mut target_name.header) == 0 {
-                let friendly_name =
-                    String::from_utf16_lossy(&target_name.monitorFriendlyDeviceName)
-                        .trim_matches(char::from(0))
-                        .to_string();
-                let device_path = String::from_utf16_lossy(&target_name.monitorDevicePath)
+                friendly_name = String::from_utf16_lossy(&target_name.monitorFriendlyDeviceName)
                     .trim_matches(char::from(0))
                     .to_string();
-
-                println!("Target ID: {}", path.targetInfo.id);
-                println!("  Friendly Name: {}", friendly_name);
-                println!("  Device Path: {}", device_path);
             }
+
+            println!(
+                "Path {}: Name: '{}', Active: {}, Available: {}, TargetID: {}, statusFlags: {:08x}",
+                i,
+                friendly_name,
+                active,
+                target_available,
+                path.targetInfo.id,
+                path.targetInfo.statusFlags
+            );
         }
     }
 }

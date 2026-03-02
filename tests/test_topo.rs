@@ -2,7 +2,7 @@ use windows::Win32::Devices::Display::{
     DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME, DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME,
     DISPLAYCONFIG_MODE_INFO, DISPLAYCONFIG_PATH_INFO, DISPLAYCONFIG_SOURCE_DEVICE_NAME,
     DISPLAYCONFIG_TARGET_DEVICE_NAME, DisplayConfigGetDeviceInfo, GetDisplayConfigBufferSizes,
-    QDC_ALL_PATHS, QueryDisplayConfig,
+    QDC_ALL_PATHS, QDC_DATABASE_CURRENT, QueryDisplayConfig,
 };
 use windows::Win32::Foundation::WIN32_ERROR;
 
@@ -11,7 +11,7 @@ fn test_topo() {
     unsafe {
         let mut path_count = 0;
         let mut mode_count = 0;
-        if GetDisplayConfigBufferSizes(QDC_ALL_PATHS, &mut path_count, &mut mode_count)
+        if GetDisplayConfigBufferSizes(QDC_DATABASE_CURRENT, &mut path_count, &mut mode_count)
             != WIN32_ERROR(0)
         {
             println!("GetDisplayConfigBufferSizes failed");
@@ -22,7 +22,7 @@ fn test_topo() {
         let mut modes = vec![DISPLAYCONFIG_MODE_INFO::default(); mode_count as usize];
 
         if QueryDisplayConfig(
-            QDC_ALL_PATHS,
+            QDC_DATABASE_CURRENT,
             &mut path_count,
             paths.as_mut_ptr(),
             &mut mode_count,
@@ -65,9 +65,17 @@ fn test_topo() {
                     .to_string();
             }
 
-            println!("Path: active={}", path.flags & 1); // DISPLAYCONFIG_PATH_ACTIVE
-            println!("  Source: id={} name={}", path.sourceInfo.id, device_name);
-            println!("  Target: id={} name={}", path.targetInfo.id, friendly_name);
+            let target_available = (path.targetInfo.Anonymous.Anonymous._bitfield & 1) != 0;
+            println!(
+                "Path: active={}, available={}",
+                (path.flags & 1) != 0,
+                target_available
+            );
+            println!("  Source: id={}", path.sourceInfo.id);
+            println!(
+                "  Target: id={} name='{}' statusFlags={:08x}",
+                path.targetInfo.id, friendly_name, path.targetInfo.statusFlags
+            );
         }
     }
 }

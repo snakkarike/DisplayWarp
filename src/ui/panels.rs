@@ -5,6 +5,7 @@ use egui_phosphor::regular;
 
 use crate::app::WindowManagerApp;
 use crate::models::{AppProfile, SerializableRect};
+use windows::Win32::Foundation::RECT;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -1326,30 +1327,47 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                     let scale = (rect.width() / width).min(rect.height() / height) * 0.85;
                     let center = rect.center();
 
+                    // Group monitors by rect for rendering and interaction
+                    let mut grouped_monitors: Vec<(RECT, Vec<usize>)> = Vec::new();
+                    for (i, m) in app.monitors.iter().enumerate() {
+                        if let Some(group) = grouped_monitors.iter_mut().find(|(r, _)| {
+                            r.left == m.rect.left
+                                && r.top == m.rect.top
+                                && r.right == m.rect.right
+                                && r.bottom == m.rect.bottom
+                        }) {
+                            group.1.push(i);
+                        } else {
+                            grouped_monitors.push((m.rect, vec![i]));
+                        }
+                    }
+
                     // Handle Dragging Logic
                     if response.drag_started() {
                         if let Some(pointer_pos) = response.interact_pointer_pos() {
-                            for (i, m) in app.monitors.iter().enumerate() {
+                            for (rect_val, indices) in &grouped_monitors {
                                 let m_rect = egui::Rect::from_min_max(
                                     center
                                         + egui::vec2(
-                                            (m.rect.left - min_x) as f32 * scale
+                                            (rect_val.left - min_x) as f32 * scale
                                                 - (width * scale / 2.0),
-                                            (m.rect.top - min_y) as f32 * scale
+                                            (rect_val.top - min_y) as f32 * scale
                                                 - (height * scale / 2.0),
                                         ),
                                     center
                                         + egui::vec2(
-                                            (m.rect.right - min_x) as f32 * scale
+                                            (rect_val.right - min_x) as f32 * scale
                                                 - (width * scale / 2.0),
-                                            (m.rect.bottom - min_y) as f32 * scale
+                                            (rect_val.bottom - min_y) as f32 * scale
                                                 - (height * scale / 2.0),
                                         ),
                                 );
                                 if m_rect.contains(pointer_pos) {
-                                    app.dragging_monitor_idx = Some(i);
+                                    // Store the first index as the primary dragging handle,
+                                    // but we'll move all in the group.
+                                    app.dragging_monitor_idx = Some(indices[0]);
                                     app.drag_start_pos = Some(pointer_pos);
-                                    app.original_monitor_rect = Some(m.rect.clone());
+                                    app.original_monitor_rect = Some(*rect_val);
                                     break;
                                 }
                             }
@@ -1389,7 +1407,17 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                                 // Collision Detection
                                 let mut collision = false;
                                 for (other_idx, other_m) in app.monitors.iter().enumerate() {
-                                    if other_idx == idx {
+                                    // Check if this other monitor is part of the same group as the dragging one
+                                    let is_in_dragging_group = if let Some(grp) = grouped_monitors
+                                        .iter()
+                                        .find(|g: &&(RECT, Vec<usize>)| g.1.contains(&idx))
+                                    {
+                                        grp.1.contains(&other_idx)
+                                    } else {
+                                        other_idx == idx
+                                    };
+
+                                    if is_in_dragging_group {
                                         continue;
                                     }
                                     if new_rect.intersects_rect(&other_m.rect) {
@@ -1399,7 +1427,17 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                                 }
 
                                 if !collision {
-                                    app.monitors[idx].rect = new_rect.to_rect();
+                                    // Move all monitors in the group
+                                    if let Some(grp) = grouped_monitors
+                                        .iter()
+                                        .find(|g: &&(RECT, Vec<usize>)| g.1.contains(&idx))
+                                    {
+                                        for &group_idx in &grp.1 {
+                                            app.monitors[group_idx].rect = new_rect.to_rect();
+                                        }
+                                    } else {
+                                        app.monitors[idx].rect = new_rect.to_rect();
+                                    }
                                 }
                             }
                         }
@@ -1412,18 +1450,19 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                     }
 
                     // Draw Rects
-                    for (i, m) in app.monitors.iter().enumerate() {
-                        let is_primary = m.rect.left == 0 && m.rect.top == 0;
+                    for (rect_val, indices) in grouped_monitors {
+                        let is_primary = rect_val.left == 0 && rect_val.top == 0;
                         let m_rect = egui::Rect::from_min_max(
                             center
                                 + egui::vec2(
-                                    (m.rect.left - min_x) as f32 * scale - (width * scale / 2.0),
-                                    (m.rect.top - min_y) as f32 * scale - (height * scale / 2.0),
+                                    (rect_val.left - min_x) as f32 * scale - (width * scale / 2.0),
+                                    (rect_val.top - min_y) as f32 * scale - (height * scale / 2.0),
                                 ),
                             center
                                 + egui::vec2(
-                                    (m.rect.right - min_x) as f32 * scale - (width * scale / 2.0),
-                                    (m.rect.bottom - min_y) as f32 * scale - (height * scale / 2.0),
+                                    (rect_val.right - min_x) as f32 * scale - (width * scale / 2.0),
+                                    (rect_val.bottom - min_y) as f32 * scale
+                                        - (height * scale / 2.0),
                                 ),
                         );
 
@@ -1442,10 +1481,25 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                         };
 
                         painter.rect_filled(m_rect, 4.0, fill);
+
+                        // Label with all monitor indices in the group
+                        let label = if indices.len() > 1 {
+                            format!(
+                                "Monitors {}",
+                                indices
+                                    .iter()
+                                    .map(|&i| (i + 1).to_string())
+                                    .collect::<Vec<_>>()
+                                    .join(" | ")
+                            )
+                        } else {
+                            format!("Monitor {}", indices[0] + 1)
+                        };
+
                         painter.text(
                             m_rect.center(),
                             egui::Align2::CENTER_CENTER,
-                            format!("Monitor {}", i + 1).to_owned(),
+                            label.to_owned(),
                             egui::FontId::proportional(14.0),
                             egui::Color32::WHITE,
                         );
@@ -1459,120 +1513,48 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                         painter.text(
                             m_rect.left_top() + egui::vec2(6.0, 6.0),
                             egui::Align2::LEFT_TOP,
-                            format!("{}, {}", m.rect.left, m.rect.top).to_owned(),
+                            format!("{}, {}", rect_val.left, rect_val.top).to_owned(),
                             egui::FontId::proportional(10.0),
                             egui::Color32::from_white_alpha(150),
                         );
                     }
 
-                    ui.add_space(12.0);
-                    ui.separator();
-                    ui.add_space(8.0);
+                    // Draw Inactive Displays shelf
+                    let inactive_targets: Vec<_> = app
+                        .display_targets
+                        .iter()
+                        .filter(|t| !t.is_active)
+                        .cloned()
+                        .collect();
 
-                    // Display Topology Controls
-                    ui.label(egui::RichText::new("Display Topology").strong());
-                    ui.label(
-                        egui::RichText::new(
-                            "Quickly change how Windows handles your displays per monitor.",
-                        )
-                        .small()
-                        .color(if app.dark_mode {
-                            egui::Color32::from_gray(140)
-                        } else {
-                            egui::Color32::from_gray(100)
-                        }),
-                    );
-                    ui.add_space(8.0);
-
-                    let display_targets = app.display_targets.clone();
-                    for m in &display_targets {
+                    if !inactive_targets.is_empty() {
+                        ui.add_space(8.0);
                         ui.horizontal(|ui| {
-                            let (status_icon, status_color) = if m.is_active {
-                                (regular::CHECK_CIRCLE, egui::Color32::LIGHT_GREEN)
-                            } else {
-                                (regular::X_CIRCLE, egui::Color32::GRAY)
-                            };
-
-                            ui.label(egui::RichText::new(status_icon).color(status_color));
-
-                            let mut name = m
-                                .hardware_name
-                                .clone()
-                                .unwrap_or_else(|| m.device_name.clone());
-                            if name.is_empty() {
-                                name = "Unknown Display".to_string();
-                            }
-                            ui.label(egui::RichText::new(truncate_text(&name, 25)).strong());
-
-                            ui.with_layout(
-                                egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| {
-                                    if let Some(target_id) = m.target_id {
-                                        if ui
-                                            .button(format!("{} Disconnect", regular::POWER))
-                                            .clicked()
-                                        {
-                                            crate::monitor::set_monitor_state(
-                                                target_id,
-                                                "Disconnect",
-                                            );
-                                            WindowManagerApp::push_status(
-                                                &app.status_message,
-                                                &app.status_log,
-                                                format!("🔌 Disconnected {}.", name),
-                                            );
-                                            app.refresh_monitors();
-                                        }
-                                        if ui
-                                            .button(format!("{} Duplicate", regular::COPY))
-                                            .clicked()
-                                        {
-                                            crate::monitor::set_monitor_state(
-                                                target_id,
-                                                "Duplicate",
-                                            );
-                                            WindowManagerApp::push_status(
-                                                &app.status_message,
-                                                &app.status_log,
-                                                format!("👯 Duplicated {}.", name),
-                                            );
-                                            app.refresh_monitors();
-                                        }
-                                        if ui
-                                            .button(format!(
-                                                "{} Extend",
-                                                regular::ARROWS_OUT_LINE_HORIZONTAL
-                                            ))
-                                            .clicked()
-                                        {
-                                            crate::monitor::set_monitor_state(target_id, "Extend");
-                                            WindowManagerApp::push_status(
-                                                &app.status_message,
-                                                &app.status_log,
-                                                format!("🖥️ Extended {}.", name),
-                                            );
-                                            app.refresh_monitors();
-                                        }
-                                        if ui
-                                            .button(format!("{} Reconnect", regular::PLUG))
-                                            .clicked()
-                                        {
-                                            crate::monitor::set_monitor_state(
-                                                target_id,
-                                                "Reconnect",
-                                            );
-                                            WindowManagerApp::push_status(
-                                                &app.status_message,
-                                                &app.status_log,
-                                                format!("🔌 Reconnected {}.", name),
-                                            );
-                                            app.refresh_monitors();
-                                        }
-                                    }
-                                },
+                            ui.label(
+                                egui::RichText::new("Disconnected Displays (click to Reconnect):")
+                                    .small(),
                             );
+                            for target in inactive_targets {
+                                let name = target
+                                    .hardware_name
+                                    .clone()
+                                    .unwrap_or_else(|| "Unknown".to_string());
+                                let btn = ui.add(
+                                    egui::Button::new(format!(
+                                        "{} {}",
+                                        regular::PLUG,
+                                        truncate_text(&name, 15)
+                                    ))
+                                    .small(),
+                                );
+                                if btn.clicked() {
+                                    if let Some(tid) = target.target_id {
+                                        crate::monitor::set_monitor_state(tid, "Reconnect");
+                                        app.refresh_monitors();
+                                    }
+                                }
+                            }
                         });
-                        ui.add_space(4.0);
                     }
 
                     ui.add_space(12.0);
@@ -1650,6 +1632,140 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                 .show(ui, |ui| {
                     ui.set_width(ui.available_width());
                     ui.set_min_height(ui.available_height());
+
+                    // Display Topology Controls
+                    egui::Frame::group(ui.style())
+                        .inner_margin(egui::Margin::same(12))
+                        .corner_radius(egui::CornerRadius::same(8))
+                        .fill(if app.dark_mode {
+                            egui::Color32::from_rgb(30, 30, 30)
+                        } else {
+                            egui::Color32::from_rgb(241, 245, 249)
+                        })
+                        .show(ui, |ui| {
+                            ui.set_width(ui.available_width());
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "{} Display Topology",
+                                    regular::MONITOR
+                                ))
+                                .size(16.0)
+                                .strong(),
+                            );
+                            ui.label(
+                                egui::RichText::new(
+                                    "Quickly change how Windows handles your displays per monitor.",
+                                )
+                                .small()
+                                .color(if app.dark_mode {
+                                    egui::Color32::from_gray(140)
+                                } else {
+                                    egui::Color32::from_gray(100)
+                                }),
+                            );
+                            ui.add_space(8.0);
+
+                            let display_targets = app.display_targets.clone();
+                            for m in &display_targets {
+                                ui.horizontal(|ui| {
+                                    let (status_icon, status_color) = if m.is_active {
+                                        (regular::CHECK_CIRCLE, egui::Color32::LIGHT_GREEN)
+                                    } else {
+                                        (regular::X_CIRCLE, egui::Color32::GRAY)
+                                    };
+
+                                    ui.label(egui::RichText::new(status_icon).color(status_color));
+
+                                    let mut name = m
+                                        .hardware_name
+                                        .clone()
+                                        .unwrap_or_else(|| m.device_name.clone());
+                                    if name.is_empty() {
+                                        name = "Unknown Display".to_string();
+                                    }
+                                    ui.label(
+                                        egui::RichText::new(truncate_text(&name, 18)).strong(),
+                                    );
+
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center),
+                                        |ui| {
+                                            if let Some(target_id) = m.target_id {
+                                                if ui
+                                                    .button(format!("{}", regular::POWER))
+                                                    .on_hover_text("Disconnect")
+                                                    .clicked()
+                                                {
+                                                    crate::monitor::set_monitor_state(
+                                                        target_id,
+                                                        "Disconnect",
+                                                    );
+                                                    WindowManagerApp::push_status(
+                                                        &app.status_message,
+                                                        &app.status_log,
+                                                        format!("🔌 Disconnected {}.", name),
+                                                    );
+                                                    app.refresh_monitors();
+                                                }
+                                                if ui
+                                                    .button(format!("{}", regular::COPY))
+                                                    .on_hover_text("Duplicate")
+                                                    .clicked()
+                                                {
+                                                    crate::monitor::set_monitor_state(
+                                                        target_id,
+                                                        "Duplicate",
+                                                    );
+                                                    WindowManagerApp::push_status(
+                                                        &app.status_message,
+                                                        &app.status_log,
+                                                        format!("👯 Duplicated {}.", name),
+                                                    );
+                                                    app.refresh_monitors();
+                                                }
+                                                if ui
+                                                    .button(format!(
+                                                        "{}",
+                                                        regular::ARROWS_OUT_LINE_HORIZONTAL
+                                                    ))
+                                                    .on_hover_text("Extend")
+                                                    .clicked()
+                                                {
+                                                    crate::monitor::set_monitor_state(
+                                                        target_id, "Extend",
+                                                    );
+                                                    WindowManagerApp::push_status(
+                                                        &app.status_message,
+                                                        &app.status_log,
+                                                        format!("🖥️ Extended {}.", name),
+                                                    );
+                                                    app.refresh_monitors();
+                                                }
+                                                if ui
+                                                    .button(format!("{}", regular::PLUG))
+                                                    .on_hover_text("Reconnect")
+                                                    .clicked()
+                                                {
+                                                    crate::monitor::set_monitor_state(
+                                                        target_id,
+                                                        "Reconnect",
+                                                    );
+                                                    WindowManagerApp::push_status(
+                                                        &app.status_message,
+                                                        &app.status_log,
+                                                        format!("🔌 Reconnected {}.", name),
+                                                    );
+                                                    app.refresh_monitors();
+                                                }
+                                            }
+                                        },
+                                    );
+                                });
+                                ui.add_space(4.0);
+                            }
+                        });
+
+                    ui.add_space(16.0);
 
                     ui.label(
                         egui::RichText::new(format!("{} Saved Profiles", regular::BOOKMARK_SIMPLE))
