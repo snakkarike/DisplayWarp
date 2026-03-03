@@ -27,8 +27,7 @@ fn main() -> eframe::Result {
         let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
     }
     // Decode the PNG icon for the window titlebar.
-    let (icon_rgba, w, h) =
-        svg_render::png_to_rgba(include_bytes!("../assets/DisplayWarpIconTitlebar.png"));
+    let (icon_rgba, w, h) = svg_render::png_to_rgba(include_bytes!("../assets/DisplayWarp64.png"));
     let icon = egui::IconData {
         rgba: icon_rgba,
         width: w,
