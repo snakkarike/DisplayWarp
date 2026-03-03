@@ -7,7 +7,7 @@ use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 /// Decode the DisplayWarp PNG icon for the tray.
 fn tray_icon() -> Icon {
     let (rgba, w, h) =
-        crate::svg_render::png_to_rgba(include_bytes!("../assets/DisplayWarpDesktopIcon.png"));
+        crate::svg_render::png_to_rgba(include_bytes!("../assets/DisplayWarpIcon64.png"));
     Icon::from_rgba(rgba, w, h).expect("failed to create tray icon")
 }
 
