@@ -16,10 +16,16 @@
 
 ## Screenshots
 
-![Warp](screenshots/DisplayWarp-Warp.png)
-![Display](screenshots/DisplayWarp-Display.png)
-![Settings](screenshots/DisplayWarp-Settings.png)
-![Log](screenshots/DisplayWarp-Log.png)
+<table>
+  <tr>
+    <td><img src="screenshots/DisplayWarp-Warp.png" alt="Warp"></td>
+    <td><img src="screenshots/DisplayWarp-Display.png" alt="Display"></td>
+  </tr>
+  <tr>
+    <td><img src="screenshots/DisplayWarp-Log.png" alt="Log"></td>
+    <td><img src="screenshots/DisplayWarp-Settings.png" alt="Settings"></td>
+  </tr>
+</table>
 
 ---
 
