@@ -30,6 +30,12 @@ pub struct AppProfile {
     /// will be attempted on launch/move.
     #[serde(default)]
     pub target_audio_device_id: Option<String>,
+    /// Optional command-line arguments to pass when launching the profile.
+    #[serde(default)]
+    pub launch_args: Option<String>,
+    /// Optional window title wildcard matching, to capture dynamically named windows.
+    #[serde(default)]
+    pub window_title_match: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]

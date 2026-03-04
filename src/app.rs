@@ -19,6 +19,7 @@ pub enum AppTab {
     Display,
     Log,
     Settings,
+    QuickWarp,
 }
 
 pub struct WindowManagerApp {
@@ -33,12 +34,16 @@ pub struct WindowManagerApp {
     pub new_profile_exe: Option<std::path::PathBuf>,
     pub selected_mon_idx: usize,
     pub new_profile_window_process: String,
+    pub new_profile_launch_args: String,
+    pub new_profile_window_title: String,
     // ── Edit profile form state ──
     pub editing_profile_idx: Option<usize>,
     pub edit_profile_name: String,
     pub edit_profile_exe: Option<std::path::PathBuf>,
     pub edit_profile_mon_idx: usize,
     pub edit_profile_window_process: String,
+    pub edit_profile_launch_args: String,
+    pub edit_profile_window_title: String,
     // ── Live-process mover state ──
     pub live_processes: Vec<ProcessEntry>,
     pub selected_live_process_idx: usize,
@@ -85,11 +90,15 @@ impl Default for WindowManagerApp {
             new_profile_exe: None,
             selected_mon_idx: 0,
             new_profile_window_process: String::new(),
+            new_profile_launch_args: String::new(),
+            new_profile_window_title: String::new(),
             editing_profile_idx: None,
             edit_profile_name: String::new(),
             edit_profile_exe: None,
             edit_profile_mon_idx: 0,
             edit_profile_window_process: String::new(),
+            edit_profile_launch_args: String::new(),
+            edit_profile_window_title: String::new(),
             live_processes: vec![],
             selected_live_process_idx: 0,
             live_move_mon_idx: 0,
@@ -294,6 +303,8 @@ impl WindowManagerApp {
         let device_name = profile.target_monitor_name.clone();
         let window_process_name = profile.window_process_name.clone();
         let audio_device_id = profile.target_audio_device_id.clone();
+        let launch_args = profile.launch_args.clone();
+        let _window_title_match = profile.window_title_match.clone();
 
         let live_monitors = get_all_monitors();
         let target_rect = Self::find_monitor_rect(&live_monitors, &device_name).or_else(|| {
@@ -320,7 +331,16 @@ impl WindowManagerApp {
             .parent()
             .unwrap_or(std::path::Path::new("."))
             .to_path_buf();
-        let child = match std::process::Command::new(&exe).current_dir(&cwd).spawn() {
+        let mut cmd = std::process::Command::new(&exe);
+        cmd.current_dir(&cwd);
+        if let Some(args_str) = launch_args {
+            if !args_str.trim().is_empty() {
+                for arg in args_str.split_whitespace() {
+                    cmd.arg(arg);
+                }
+            }
+        }
+        let child = match cmd.spawn() {
             Ok(c) => c,
             Err(e) => {
                 Self::push_status(&status, &log, format!("❌ Failed to launch: {e}"));
