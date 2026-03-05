@@ -104,7 +104,12 @@ fn main() -> eframe::Result {
                 "logo-light",
             );
 
-            let tray_items = tray::create_tray(app.watcher_running.clone());
+            let tray_items = tray::create_tray(
+                app.watcher_running.clone(),
+                app.data.clone(),
+                app.status_message.clone(),
+                app.status_log.clone(),
+            );
             app.tray = Some(tray_items);
             Ok(Box::new(app))
         }),

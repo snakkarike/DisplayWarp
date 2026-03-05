@@ -851,8 +851,14 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                         });
 
                     if let Some(idx) = to_remove {
+                        let name = app.data.lock().display_profiles[idx].name.clone();
                         app.data.lock().display_profiles.remove(idx);
                         app.save_data();
+                        crate::app::WindowManagerApp::push_status(
+                            &app.status_message,
+                            &app.status_log,
+                            format!("🗑 Display layout deleted: {}", name),
+                        );
                     }
                 });
         });

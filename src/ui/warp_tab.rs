@@ -54,8 +54,19 @@ pub fn draw_profiles_list(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
         }
     }
     if let Some(i) = to_remove {
+        let name = app.data.lock().profiles[i].name.clone();
         app.data.lock().profiles.remove(i);
         app.save_data();
+        // Refresh tray so deleted profile is removed from tray menu
+        let profiles = app.data.lock().profiles.clone();
+        if let Some(t) = &app.tray {
+            t.refresh_menu(&profiles);
+        }
+        WindowManagerApp::push_status(
+            &app.status_message,
+            &app.status_log,
+            format!("🗑 Profile deleted: {}", name),
+        );
     }
 }
 
@@ -655,6 +666,16 @@ fn draw_edit_profile_form(
                         };
                         drop(data);
                         app.save_data();
+                        // Refresh tray after profile edit
+                        let profiles = app.data.lock().profiles.clone();
+                        if let Some(t) = &app.tray {
+                            t.refresh_menu(&profiles);
+                        }
+                        WindowManagerApp::push_status(
+                            &app.status_message,
+                            &app.status_log,
+                            "📝 Profile saved.",
+                        );
                     }
                     app.editing_profile_idx = None;
                     app.edit_profile_exe = None;
@@ -1091,7 +1112,16 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             app.new_profile_window_title.clear();
             app.new_profile_audio_device_idx = 0;
             app.save_data();
-            *app.status_message.lock() = "✅ Profile created.".into();
+            // Refresh tray so new profile appears in tray menu
+            let profiles = app.data.lock().profiles.clone();
+            if let Some(t) = &app.tray {
+                t.refresh_menu(&profiles);
+            }
+            WindowManagerApp::push_status(
+                &app.status_message,
+                &app.status_log,
+                "✅ Profile created.",
+            );
         }
     }
 }
@@ -1285,10 +1315,22 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                         target_audio_device_id: None,
                     });
                     app.save_data();
-                    *app.status_message.lock() = "✅ Profile created from live process.".into();
+                    // Refresh tray so quick-created profile appears in tray menu
+                    let profiles = app.data.lock().profiles.clone();
+                    if let Some(t) = &app.tray {
+                        t.refresh_menu(&profiles);
+                    }
+                    WindowManagerApp::push_status(
+                        &app.status_message,
+                        &app.status_log,
+                        "✅ Profile created from live process.",
+                    );
                 } else {
-                    *app.status_message.lock() =
-                        "❌ Could not determine executable path for this process.".into();
+                    WindowManagerApp::push_status(
+                        &app.status_message,
+                        &app.status_log,
+                        "❌ Could not determine executable path for this process.",
+                    );
                 }
             }
         }

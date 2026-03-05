@@ -2,7 +2,6 @@ pub mod display_tab;
 pub mod helpers;
 pub mod log_tab;
 pub mod monitor_preview;
-pub mod quick_warp_tab;
 pub mod settings_tab;
 pub mod warp_tab;
 
@@ -150,7 +149,6 @@ impl eframe::App for WindowManagerApp {
                     // Force the active selection text color to white so it contrasts with the purple background
                     ui.visuals_mut().selection.stroke.color = egui::Color32::WHITE;
 
-                    ui.selectable_value(&mut self.current_tab, AppTab::QuickWarp, "Quick Warp");
                     ui.selectable_value(&mut self.current_tab, AppTab::Warp, "Warp");
                     ui.selectable_value(&mut self.current_tab, AppTab::Display, "Display");
                     ui.selectable_value(&mut self.current_tab, AppTab::Log, "Log");
@@ -163,14 +161,6 @@ impl eframe::App for WindowManagerApp {
 
             // Tab Content
             match self.current_tab {
-                AppTab::QuickWarp => {
-                    egui::ScrollArea::vertical()
-                        .auto_shrink([false; 2])
-                        .id_salt("quick_warp_scroll")
-                        .show(ui, |ui| {
-                            quick_warp_tab::draw_quick_warp_tab(self, ui);
-                        });
-                }
                 AppTab::Warp => {
                     egui::ScrollArea::vertical()
                         .auto_shrink([false; 2])

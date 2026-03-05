@@ -19,7 +19,6 @@ pub enum AppTab {
     Display,
     Log,
     Settings,
-    QuickWarp,
 }
 
 pub struct WindowManagerApp {
@@ -146,10 +145,26 @@ impl WindowManagerApp {
         let msg = msg.into();
         *status.lock() = msg.clone();
         let mut l = log.lock();
-        l.push(msg);
+        // Prepend a simple timestamp
+        let ts = Self::local_time_str();
+        l.push(format!("[{ts}] {msg}"));
         if l.len() > 200 {
             l.remove(0);
         }
+    }
+
+    /// Returns current local time as HH:MM:SS string for log timestamps.
+    fn local_time_str() -> String {
+        let secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        // UTC seconds of day — close enough for log display
+        let s = secs % 86400;
+        let h = s / 3600;
+        let m = (s % 3600) / 60;
+        let sec = s % 60;
+        format!("{h:02}:{m:02}:{sec:02}")
     }
 
     pub fn refresh_monitors(&mut self) {

@@ -212,6 +212,11 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                             if dirty {
                                 drop(data);
                                 app.save_data();
+                                crate::app::WindowManagerApp::push_status(
+                                    &app.status_message,
+                                    &app.status_log,
+                                    "⚙️ Application behavior settings updated.",
+                                );
                             }
                         });
 
@@ -253,6 +258,11 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                             if dirty {
                                 drop(data);
                                 app.save_data();
+                                crate::app::WindowManagerApp::push_status(
+                                    &app.status_message,
+                                    &app.status_log,
+                                    format!("⚙️ Watcher interval set to {}s.", interval),
+                                );
                             }
 
                             ui.add_space(6.0);
@@ -261,6 +271,91 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                                     .size(11.0)
                                     .color(egui::Color32::from_gray(140)),
                             );
+                        });
+
+                    ui.add_space(8.0);
+
+                    // Profile Import/Export Card
+                    egui::Frame::group(ui.style())
+                        .inner_margin(egui::Margin::same(12))
+                        .corner_radius(egui::CornerRadius::same(8))
+                        .fill(if app.dark_mode {
+                            egui::Color32::from_rgb(34, 34, 34)
+                        } else {
+                            egui::Color32::from_rgb(241, 245, 249)
+                        })
+                        .stroke(egui::Stroke::new(
+                            1.0,
+                            if app.dark_mode {
+                                egui::Color32::from_rgb(44, 44, 44)
+                            } else {
+                                egui::Color32::from_rgb(226, 232, 240)
+                            },
+                        ))
+                        .show(ui, |ui| {
+                            ui.set_width(ui.available_width());
+                            ui.label(egui::RichText::new(format!("{} Profile Backup", regular::ARCHIVE)).strong());
+                            ui.add_space(4.0);
+                            ui.label(
+                                egui::RichText::new("Export or import all profiles as JSON.")
+                                    .small()
+                                    .color(egui::Color32::from_gray(140)),
+                            );
+                            ui.add_space(8.0);
+                            ui.horizontal(|ui| {
+                                if ui.button(format!("{} Export", regular::EXPORT)).clicked() {
+                                    let profiles_json = {
+                                        let d = app.data.lock();
+                                        serde_json::to_string_pretty(&d.profiles).unwrap_or_default()
+                                    };
+                                    if let Some(path) = rfd::FileDialog::new()
+                                        .set_file_name("displaywarp_profiles.json")
+                                        .add_filter("JSON", &["json"])
+                                        .save_file()
+                                    {
+                                        let ok = std::fs::write(&path, &profiles_json).is_ok();
+                                        crate::app::WindowManagerApp::push_status(
+                                            &app.status_message,
+                                            &app.status_log,
+                                            if ok { "📦 Profiles exported." } else { "❌ Export failed." },
+                                        );
+                                    }
+                                }
+                                if ui.button(format!("{} Import", regular::DOWNLOAD_SIMPLE)).clicked() {
+                                    if let Some(path) = rfd::FileDialog::new()
+                                        .add_filter("JSON", &["json"])
+                                        .pick_file()
+                                    {
+                                        if let Ok(bytes) = std::fs::read(&path) {
+                                            if let Ok(imported) = serde_json::from_slice::<Vec<crate::models::AppProfile>>(&bytes) {
+                                                let mut d = app.data.lock();
+                                                let names: std::collections::HashSet<String> =
+                                                    d.profiles.iter().map(|p| p.name.clone()).collect();
+                                                let mut added = 0usize;
+                                                for p in imported {
+                                                    if !names.contains(&p.name) {
+                                                        d.profiles.push(p);
+                                                        added += 1;
+                                                    }
+                                                }
+                                                drop(d);
+                                                app.save_data();
+                                                crate::app::WindowManagerApp::push_status(
+                                                    &app.status_message,
+                                                    &app.status_log,
+                                                    format!("📦 Imported {added} profile(s)."),
+                                                );
+                                            } else {
+                                                crate::app::WindowManagerApp::push_status(
+                                                    &app.status_message,
+                                                    &app.status_log,
+                                                    "❌ Import failed — invalid format.",
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            });
                         });
                 });
         });
