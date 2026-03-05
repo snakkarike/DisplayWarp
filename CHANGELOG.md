@@ -1,3 +1,25 @@
+## v1.1.1
+
+### ✨ New Features
+
+- **System Tray Submenus & Quick Launch**: Right-clicking the tray icon now reveals dedicated **Warp Profiles** and **Display Profiles** submenus. Instantly launch an app or apply a saved monitor layout with a single click from the background.
+- **Profile Import & Export**: Added the ability to backup and share workspace configurations. Export your entire profile database to a `.json` file and restore it seamlessly from the Settings tab.
+- **Profile Reordering**: Added "Move Up" and "Move Down" buttons for organizing both your Warp App Profiles and Display Layouts. Custom ordering syncs instantly with the system tray menu.
+- **Advanced Launch Arguments**: Inject custom command-line arguments directly into any warp profile when launching.
+- **Precise Window Title Matching**: You can now provide a Window Title Filter substring to ensure DisplayWarp grabs the exact named window you want, helpful for multi-window apps like Chrome or VS Code.
+- **Native Windows Toast Notifications**: DisplayWarp now leverages native Windows 10/11 Toast notifications (bottom-right popups) to alert you when profiles launch correctly, layouts finish applying, or if an action times out.
+
+### 💄 UI & UX Polish
+
+- **Log Tab Enhancement**: Added millisecond-precise timestamps to all log events, color-coded status emojis for rapid parsing, and a handy "Clear Log" button.
+
+### 🛠️ Fixes & Optimizations
+
+- **Massive Codebase Restructuring**: Cleanly dismantled the monolithic 2,000+ line UI file into a modular, tab-based architecture (`warp_tab.rs`, `display_tab.rs`, `settings_tab.rs`, etc). The codebase is now immensely easier to maintain and extend.
+- **Tray Thread Safety**: Improved thread safety (`Arc<Mutex>`) when communicating between the background system tray listener and the primary EGUI rendering thread.
+
+---
+
 ## v1.1.0
 
 ### ✨ New Features & Improvements

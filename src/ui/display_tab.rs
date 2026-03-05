@@ -767,7 +767,6 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                     );
                     ui.add_space(8.0);
 
-                    let mut to_remove = None;
                     let display_profiles = app.data.lock().display_profiles.clone();
 
                     if display_profiles.is_empty() {
@@ -776,6 +775,10 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                                 .color(egui::Color32::GRAY),
                         );
                     }
+
+                    let mut to_remove: Option<usize> = None;
+                    let mut to_move_up: Option<usize> = None;
+                    let mut to_move_down: Option<usize> = None;
 
                     egui::ScrollArea::vertical()
                         .id_salt("display_profiles_scroll")
@@ -798,62 +801,108 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                                         },
                                     ))
                                     .show(ui, |ui| {
-                                        ui.horizontal(|ui| {
-                                            ui.label(egui::RichText::new(&p.name).strong());
-                                            ui.with_layout(
-                                                egui::Layout::right_to_left(egui::Align::Center),
-                                                |ui| {
-                                                    if ui
-                                                        .button(format!("{} Apply", regular::PLAY))
-                                                        .clicked()
-                                                    {
-                                                        crate::monitor::restore_monitor_layout(
-                                                            &p.monitors,
-                                                        );
-                                                        WindowManagerApp::push_status(
-                                                            &app.status_message,
-                                                            &app.status_log,
-                                                            format!("✅ Applied '{}'", p.name),
-                                                        );
-                                                        app.refresh_monitors();
-                                                    }
-                                                    if ui
-                                                        .button(format!("{} View", regular::EYE))
-                                                        .clicked()
-                                                    {
-                                                        for profile_mon in &p.monitors {
-                                                            if let Some(mon) =
-                                                                app.monitors.iter_mut().find(|m| {
-                                                                    m.device_name
-                                                                        == profile_mon.device_name
-                                                                })
-                                                            {
-                                                                mon.rect =
-                                                                    profile_mon.rect.to_rect();
-                                                            }
+                                        ui.vertical(|ui| {
+                                            // Top Row: Name on left, Arrows on right
+                                            ui.horizontal(|ui| {
+                                                ui.label(egui::RichText::new(&p.name).strong());
+                                                ui.with_layout(
+                                                    egui::Layout::right_to_left(
+                                                        egui::Align::Center,
+                                                    ),
+                                                    |ui| {
+                                                        if ui.button(regular::CARET_DOWN).clicked()
+                                                        {
+                                                            to_move_down = Some(i);
+                                                        }
+                                                        if ui.button(regular::CARET_UP).clicked() {
+                                                            to_move_up = Some(i);
+                                                        }
+                                                    },
+                                                );
+                                            });
+
+                                            ui.add_space(4.0);
+
+                                            // Bottom Row: The 3 main action buttons
+                                            ui.horizontal(|ui| {
+                                                if ui
+                                                    .button(format!("{} Apply", regular::PLAY))
+                                                    .clicked()
+                                                {
+                                                    crate::monitor::restore_monitor_layout(
+                                                        &p.monitors,
+                                                    );
+                                                    WindowManagerApp::push_status(
+                                                        &app.status_message,
+                                                        &app.status_log,
+                                                        format!("✅ Applied '{}'", p.name),
+                                                    );
+                                                    app.refresh_monitors();
+                                                }
+                                                if ui
+                                                    .button(format!("{} View", regular::EYE))
+                                                    .clicked()
+                                                {
+                                                    for profile_mon in &p.monitors {
+                                                        if let Some(mon) =
+                                                            app.monitors.iter_mut().find(|m| {
+                                                                m.device_name
+                                                                    == profile_mon.device_name
+                                                            })
+                                                        {
+                                                            mon.rect = profile_mon.rect.to_rect();
                                                         }
                                                     }
-                                                    if ui
-                                                        .button(format!(
-                                                            "{} Delete",
-                                                            regular::TRASH
-                                                        ))
-                                                        .clicked()
-                                                    {
-                                                        to_remove = Some(i);
-                                                    }
-                                                },
-                                            );
+                                                }
+                                                if ui
+                                                    .button(format!("{} Delete", regular::TRASH))
+                                                    .clicked()
+                                                {
+                                                    to_remove = Some(i);
+                                                }
+                                            });
                                         });
                                     });
                                 ui.add_space(4.0);
                             }
                         });
 
+                    if let Some(i) = to_move_up {
+                        if i > 0 {
+                            app.data.lock().display_profiles.swap(i, i - 1);
+                            app.save_data();
+                            let profiles = app.data.lock().profiles.clone();
+                            let display_profiles = app.data.lock().display_profiles.clone();
+                            if let Some(t) = &app.tray {
+                                t.refresh_menu(&profiles, &display_profiles);
+                            }
+                        }
+                    }
+
+                    if let Some(i) = to_move_down {
+                        let len = app.data.lock().display_profiles.len();
+                        if i < len - 1 {
+                            app.data.lock().display_profiles.swap(i, i + 1);
+                            app.save_data();
+                            let profiles = app.data.lock().profiles.clone();
+                            let display_profiles = app.data.lock().display_profiles.clone();
+                            if let Some(t) = &app.tray {
+                                t.refresh_menu(&profiles, &display_profiles);
+                            }
+                        }
+                    }
+
                     if let Some(idx) = to_remove {
                         let name = app.data.lock().display_profiles[idx].name.clone();
                         app.data.lock().display_profiles.remove(idx);
                         app.save_data();
+
+                        let profiles = app.data.lock().profiles.clone();
+                        let display_profiles = app.data.lock().display_profiles.clone();
+                        if let Some(t) = &app.tray {
+                            t.refresh_menu(&profiles, &display_profiles);
+                        }
+
                         crate::app::WindowManagerApp::push_status(
                             &app.status_message,
                             &app.status_log,

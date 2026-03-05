@@ -2,10 +2,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use parking_lot::Mutex;
-use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem};
+use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem, Submenu};
 use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
-use crate::models::{AppProfile, SavedData};
+use crate::models::{AppProfile, SavedData, SavedDisplayLayout};
 
 fn tray_icon() -> Icon {
     let (rgba, w, h) =
@@ -13,35 +13,58 @@ fn tray_icon() -> Icon {
     Icon::from_rgba(rgba, w, h).expect("failed to create tray icon")
 }
 
+#[derive(Default, Clone)]
+pub struct TrayState {
+    pub warp_ids: Vec<MenuId>,
+    pub display_ids: Vec<MenuId>,
+}
+
 pub struct TrayItems {
     tray: TrayIcon,
     /// Shared with the background event thread — updated on every menu rebuild.
-    profile_ids: Arc<Mutex<Vec<MenuId>>>,
+    state: Arc<Mutex<TrayState>>,
 }
 
 impl TrayItems {
-    /// Rebuild the tray context menu from the latest profiles list and update
-    /// the shared ID list so the background thread picks up the new IDs.
-    pub fn refresh_menu(&self, profiles: &[AppProfile]) {
+    pub fn refresh_menu(&self, profiles: &[AppProfile], layouts: &[SavedDisplayLayout]) {
         let show_item = MenuItem::new("Show", true, None);
         let quit_item = MenuItem::new("Quit", true, None);
         let menu = Menu::new();
         let _ = menu.append(&show_item);
+        let _ = menu.append(&PredefinedMenuItem::separator());
 
-        let mut new_ids = Vec::with_capacity(profiles.len());
-        if !profiles.is_empty() {
-            let _ = menu.append(&PredefinedMenuItem::separator());
+        let mut next_state = TrayState::default();
+
+        let warp_sub = Submenu::new("Warp Profiles", true);
+        if profiles.is_empty() {
+            let empty = MenuItem::new("(No profiles)", false, None);
+            let _ = warp_sub.append(&empty);
+        } else {
             for p in profiles {
                 let item = MenuItem::new(format!("▶  {}", p.name), true, None);
-                new_ids.push(item.id().clone());
-                let _ = menu.append(&item);
+                next_state.warp_ids.push(item.id().clone());
+                let _ = warp_sub.append(&item);
             }
-            let _ = menu.append(&PredefinedMenuItem::separator());
         }
+        let _ = menu.append(&warp_sub);
+
+        let disp_sub = Submenu::new("Display Profiles", true);
+        if layouts.is_empty() {
+            let empty = MenuItem::new("(No layouts)", false, None);
+            let _ = disp_sub.append(&empty);
+        } else {
+            for l in layouts {
+                let item = MenuItem::new(format!("🖥  {}", l.name), true, None);
+                next_state.display_ids.push(item.id().clone());
+                let _ = disp_sub.append(&item);
+            }
+        }
+        let _ = menu.append(&disp_sub);
+
+        let _ = menu.append(&PredefinedMenuItem::separator());
         let _ = menu.append(&quit_item);
 
-        // Push new IDs to the shared list BEFORE setting the menu
-        *self.profile_ids.lock() = new_ids;
+        *self.state.lock() = next_state;
         self.tray.set_menu(Some(Box::new(menu)));
     }
 }
@@ -58,27 +81,44 @@ pub fn create_tray(
     let show_id = show_item.id().clone();
     let quit_id = quit_item.id().clone();
 
-    // Build initial profile menu from current saved data
-    let profiles_snapshot = data.lock().profiles.clone();
-    let mut initial_profile_ids: Vec<MenuId> = Vec::with_capacity(profiles_snapshot.len());
-    let profile_items: Vec<MenuItem> = profiles_snapshot
-        .iter()
-        .map(|p| {
-            let item = MenuItem::new(format!("▶  {}", p.name), true, None);
-            initial_profile_ids.push(item.id().clone());
-            item
-        })
-        .collect();
-
     let menu = Menu::new();
     let _ = menu.append(&show_item);
-    if !profile_items.is_empty() {
-        let _ = menu.append(&PredefinedMenuItem::separator());
-        for item in &profile_items {
-            let _ = menu.append(item);
+    let _ = menu.append(&PredefinedMenuItem::separator());
+
+    let mut state = TrayState::default();
+
+    let (profiles_snapshot, layouts_snapshot) = {
+        let d = data.lock();
+        (d.profiles.clone(), d.display_profiles.clone())
+    };
+
+    let warp_sub = Submenu::new("Warp Profiles", true);
+    if profiles_snapshot.is_empty() {
+        let empty = MenuItem::new("(No profiles)", false, None);
+        let _ = warp_sub.append(&empty);
+    } else {
+        for p in &profiles_snapshot {
+            let item = MenuItem::new(format!("▶  {}", p.name), true, None);
+            state.warp_ids.push(item.id().clone());
+            let _ = warp_sub.append(&item);
         }
-        let _ = menu.append(&PredefinedMenuItem::separator());
     }
+    let _ = menu.append(&warp_sub);
+
+    let disp_sub = Submenu::new("Display Profiles", true);
+    if layouts_snapshot.is_empty() {
+        let empty = MenuItem::new("(No layouts)", false, None);
+        let _ = disp_sub.append(&empty);
+    } else {
+        for l in &layouts_snapshot {
+            let item = MenuItem::new(format!("🖥  {}", l.name), true, None);
+            state.display_ids.push(item.id().clone());
+            let _ = disp_sub.append(&item);
+        }
+    }
+    let _ = menu.append(&disp_sub);
+
+    let _ = menu.append(&PredefinedMenuItem::separator());
     let _ = menu.append(&quit_item);
 
     let icon = tray_icon();
@@ -89,9 +129,8 @@ pub fn create_tray(
         .build()
         .expect("failed to build tray icon");
 
-    // Shared profile IDs — updated by refresh_menu, read by background thread.
-    let profile_ids = Arc::new(Mutex::new(initial_profile_ids));
-    let profile_ids_thread = Arc::clone(&profile_ids);
+    let state_arc = Arc::new(Mutex::new(state));
+    let state_thread = Arc::clone(&state_arc);
 
     std::thread::spawn(move || {
         let receiver = MenuEvent::receiver();
@@ -104,17 +143,41 @@ pub fn create_tray(
                 } else if id == show_id {
                     show_window_native();
                 } else {
-                    // Snapshot the current IDs so we don't hold the lock while launching.
-                    let ids = profile_ids_thread.lock().clone();
-                    for (profile_idx, pid) in ids.iter().enumerate() {
+                    let st = state_thread.lock().clone();
+
+                    // Check Warp Profiles
+                    let mut found = false;
+                    for (idx, pid) in st.warp_ids.iter().enumerate() {
                         if id == *pid {
+                            found = true;
                             let profile = {
                                 let d = data.lock();
-                                d.profiles.get(profile_idx).cloned()
+                                d.profiles.get(idx).cloned()
                             };
                             if let Some(p) = profile {
                                 crate::app::WindowManagerApp::launch_profile(
                                     &p,
+                                    Arc::clone(&status_message),
+                                    Arc::clone(&status_log),
+                                );
+                            }
+                            break;
+                        }
+                    }
+                    if found {
+                        continue;
+                    }
+
+                    // Check Display Profiles
+                    for (idx, pid) in st.display_ids.iter().enumerate() {
+                        if id == *pid {
+                            let layout = {
+                                let d = data.lock();
+                                d.display_profiles.get(idx).cloned()
+                            };
+                            if let Some(l) = layout {
+                                crate::app::WindowManagerApp::apply_display_layout(
+                                    &l,
                                     Arc::clone(&status_message),
                                     Arc::clone(&status_log),
                                 );
@@ -127,7 +190,10 @@ pub fn create_tray(
         }
     });
 
-    TrayItems { tray, profile_ids }
+    TrayItems {
+        tray,
+        state: state_arc,
+    }
 }
 
 fn show_window_native() {

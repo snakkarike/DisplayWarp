@@ -336,6 +336,20 @@ impl WindowManagerApp {
         });
     }
 
+    /// Extracted logic to apply a saved display layout (used by tray menu and UI).
+    pub fn apply_display_layout(
+        layout: &crate::models::SavedDisplayLayout,
+        status_message: Arc<parking_lot::Mutex<String>>,
+        status_log: Arc<parking_lot::Mutex<Vec<String>>>,
+    ) {
+        crate::monitor::restore_monitor_layout(&layout.monitors);
+        Self::push_status(
+            &status_message,
+            &status_log,
+            format!("✅ Applied '{}'", layout.name),
+        );
+    }
+
     // ─── Profile launching ───────────────────────────────────────────────
 
     pub fn launch_profile(

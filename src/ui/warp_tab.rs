@@ -71,8 +71,9 @@ pub fn draw_profiles_list(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             app.data.lock().profiles.swap(i, i - 1);
             app.save_data();
             let profiles = app.data.lock().profiles.clone();
+            let display_profiles = app.data.lock().display_profiles.clone();
             if let Some(t) = &app.tray {
-                t.refresh_menu(&profiles);
+                t.refresh_menu(&profiles, &display_profiles);
             }
         }
     }
@@ -81,8 +82,9 @@ pub fn draw_profiles_list(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             app.data.lock().profiles.swap(i, i + 1);
             app.save_data();
             let profiles = app.data.lock().profiles.clone();
+            let display_profiles = app.data.lock().display_profiles.clone();
             if let Some(t) = &app.tray {
-                t.refresh_menu(&profiles);
+                t.refresh_menu(&profiles, &display_profiles);
             }
         }
     }
@@ -93,8 +95,9 @@ pub fn draw_profiles_list(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
         app.save_data();
         // Refresh tray so deleted profile is removed from tray menu
         let profiles = app.data.lock().profiles.clone();
+        let display_profiles = app.data.lock().display_profiles.clone();
         if let Some(t) = &app.tray {
-            t.refresh_menu(&profiles);
+            t.refresh_menu(&profiles, &display_profiles);
         }
         WindowManagerApp::push_status(
             &app.status_message,
@@ -729,8 +732,9 @@ fn draw_edit_profile_form(
                         app.save_data();
                         // Refresh tray after profile edit
                         let profiles = app.data.lock().profiles.clone();
+                        let display_profiles = app.data.lock().display_profiles.clone();
                         if let Some(t) = &app.tray {
-                            t.refresh_menu(&profiles);
+                            t.refresh_menu(&profiles, &display_profiles);
                         }
                         WindowManagerApp::push_status(
                             &app.status_message,
@@ -1175,8 +1179,9 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             app.save_data();
             // Refresh tray so new profile appears in tray menu
             let profiles = app.data.lock().profiles.clone();
+            let display_profiles = app.data.lock().display_profiles.clone();
             if let Some(t) = &app.tray {
-                t.refresh_menu(&profiles);
+                t.refresh_menu(&profiles, &display_profiles);
             }
             WindowManagerApp::push_status(
                 &app.status_message,
@@ -1378,8 +1383,9 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                     app.save_data();
                     // Refresh tray so quick-created profile appears in tray menu
                     let profiles = app.data.lock().profiles.clone();
+                    let display_profiles = app.data.lock().display_profiles.clone();
                     if let Some(t) = &app.tray {
-                        t.refresh_menu(&profiles);
+                        t.refresh_menu(&profiles, &display_profiles);
                     }
                     WindowManagerApp::push_status(
                         &app.status_message,
