@@ -31,6 +31,8 @@ pub fn draw_profiles_list(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
     ui.add_space(4.0);
 
     let mut to_remove: Option<usize> = None;
+    let mut to_move_up: Option<usize> = None;
+    let mut to_move_down: Option<usize> = None;
     let profiles: Vec<AppProfile> = app.data.lock().profiles.clone();
 
     if profiles.is_empty() {
@@ -45,14 +47,46 @@ pub fn draw_profiles_list(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
         );
     }
 
+    let profiles_len = profiles.len();
     for (i, p) in profiles.iter().enumerate() {
         let is_editing = app.editing_profile_idx == Some(i);
         if is_editing {
             draw_edit_profile_form(app, ui, i, p, &mut to_remove);
         } else {
-            draw_profile_card(app, ui, i, p, &mut to_remove);
+            draw_profile_card(
+                app,
+                ui,
+                i,
+                p,
+                profiles_len,
+                &mut to_remove,
+                &mut to_move_up,
+                &mut to_move_down,
+            );
         }
     }
+
+    if let Some(i) = to_move_up {
+        if i > 0 {
+            app.data.lock().profiles.swap(i, i - 1);
+            app.save_data();
+            let profiles = app.data.lock().profiles.clone();
+            if let Some(t) = &app.tray {
+                t.refresh_menu(&profiles);
+            }
+        }
+    }
+    if let Some(i) = to_move_down {
+        if i < profiles_len - 1 {
+            app.data.lock().profiles.swap(i, i + 1);
+            app.save_data();
+            let profiles = app.data.lock().profiles.clone();
+            if let Some(t) = &app.tray {
+                t.refresh_menu(&profiles);
+            }
+        }
+    }
+
     if let Some(i) = to_remove {
         let name = app.data.lock().profiles[i].name.clone();
         app.data.lock().profiles.remove(i);
@@ -77,7 +111,10 @@ fn draw_profile_card(
     ui: &mut egui::Ui,
     i: usize,
     p: &AppProfile,
+    profiles_len: usize,
     to_remove: &mut Option<usize>,
+    to_move_up: &mut Option<usize>,
+    to_move_down: &mut Option<usize>,
 ) {
     egui::Frame::group(ui.style())
         .inner_margin(egui::Margin::same(12))
@@ -97,8 +134,32 @@ fn draw_profile_card(
         ))
         .show(ui, |ui| {
             // ── Header: name + display badge (Vertical layout for narrow columns) ──
+            ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    ui.label(egui::RichText::new(&p.name).strong().size(13.0));
+                });
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .add_enabled(
+                            i < profiles_len - 1,
+                            egui::Button::new(regular::CARET_DOWN).frame(false),
+                        )
+                        .on_hover_text("Move Down")
+                        .clicked()
+                    {
+                        *to_move_down = Some(i);
+                    }
+                    if ui
+                        .add_enabled(i > 0, egui::Button::new(regular::CARET_UP).frame(false))
+                        .on_hover_text("Move Up")
+                        .clicked()
+                    {
+                        *to_move_up = Some(i);
+                    }
+                });
+            });
+
             ui.vertical(|ui| {
-                ui.label(egui::RichText::new(&p.name).strong().size(13.0));
                 ui.horizontal_wrapped(|ui| {
                     let hardware_name = app
                         .display_targets

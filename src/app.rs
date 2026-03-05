@@ -151,6 +151,35 @@ impl WindowManagerApp {
         if l.len() > 200 {
             l.remove(0);
         }
+
+        // Trigger native Windows Toast Notification for important events
+        let should_toast = msg.starts_with("✅")
+            || msg.starts_with("❌")
+            || msg.starts_with("⚠️")
+            || msg.starts_with("🚀")
+            || msg.starts_with("🗑")
+            || msg.starts_with("📦")
+            || msg.starts_with("📁")
+            || msg.starts_with("⚙️");
+
+        if should_toast {
+            // Strip the emoji prefix for the toast title/text if we want,
+            // or just show the whole thing. Let's show the whole thing as text1.
+            let toast_msg = msg.clone();
+            std::thread::spawn(move || {
+                #[cfg(windows)]
+                {
+                    use winrt_notification::{Duration, Sound, Toast};
+                    // Use a generic App ID since we don't have a registered one
+                    let _ = Toast::new(Toast::POWERSHELL_APP_ID)
+                        .title("DisplayWarp")
+                        .text1(&toast_msg)
+                        .sound(Some(Sound::SMS))
+                        .duration(Duration::Short)
+                        .show();
+                }
+            });
+        }
     }
 
     /// Returns current local time as HH:MM:SS string for log timestamps.
