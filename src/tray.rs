@@ -1,11 +1,12 @@
+use eframe::egui;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 
 use parking_lot::Mutex;
-use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem, Submenu};
-use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
+use tray_icon::{Icon, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
-use crate::models::{AppProfile, SavedData, SavedDisplayLayout};
+use crate::models::SavedData;
 
 fn tray_icon() -> Icon {
     let (rgba, w, h) =
@@ -13,56 +14,45 @@ fn tray_icon() -> Icon {
     Icon::from_rgba(rgba, w, h).expect("failed to create tray icon")
 }
 
-/// Detects whether Windows is currently in dark mode.
-/// Returns `true` for dark mode, `false` for light mode.
 fn is_dark_mode() -> bool {
     use windows::Win32::System::Registry::{
         HKEY_CURRENT_USER, KEY_READ, RegCloseKey, RegOpenKeyExW, RegQueryValueExW,
     };
     use windows::core::PCWSTR;
-
     unsafe {
         let subkey: Vec<u16> =
             "Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize\0"
                 .encode_utf16()
                 .collect();
         let value_name: Vec<u16> = "AppsUseLightTheme\0".encode_utf16().collect();
-
         let mut hkey = windows::Win32::System::Registry::HKEY::default();
-        let open_result = RegOpenKeyExW(
+        if RegOpenKeyExW(
             HKEY_CURRENT_USER,
             PCWSTR(subkey.as_ptr()),
             Some(0),
             KEY_READ,
             &mut hkey,
-        );
-        if open_result.is_err() {
+        )
+        .is_err()
+        {
             return false;
         }
-
         let mut data: u32 = 0;
         let mut data_size: u32 = std::mem::size_of::<u32>() as u32;
-
-        let query_result = RegQueryValueExW(
+        let ok = RegQueryValueExW(
             hkey,
             PCWSTR(value_name.as_ptr()),
             None,
             None,
             Some(&mut data as *mut u32 as *mut u8),
             Some(&mut data_size),
-        );
-
+        )
+        .is_ok();
         let _ = RegCloseKey(hkey);
-
-        if query_result.is_ok() {
-            data == 0
-        } else {
-            false
-        }
+        if ok { data == 0 } else { false }
     }
 }
 
-/// Ordinal-based imports from the undocumented uxtheme.dll dark mode API.
 mod uxtheme {
     use windows::Win32::Foundation::HMODULE;
     use windows::core::BOOL;
@@ -80,7 +70,6 @@ mod uxtheme {
         }
     }
 
-    /// ordinal 133 — AllowDarkModeForWindow
     pub fn allow_dark_mode_for_window(hwnd: windows::Win32::Foundation::HWND, allow: bool) {
         unsafe {
             let h = load_uxtheme();
@@ -98,7 +87,6 @@ mod uxtheme {
         }
     }
 
-    /// ordinal 135 — SetPreferredAppMode (2 = ForceDark, 1 = AllowDark, 0 = Default)
     pub fn set_preferred_app_mode(mode: i32) {
         unsafe {
             let h = load_uxtheme();
@@ -116,7 +104,6 @@ mod uxtheme {
         }
     }
 
-    /// ordinal 136 — FlushMenuThemes
     pub fn flush_menu_themes() {
         unsafe {
             let h = load_uxtheme();
@@ -135,13 +122,11 @@ mod uxtheme {
     }
 }
 
-/// Apply dark/light mode to the app window title bar and context menus.
 fn apply_window_dark_mode(dark: bool) {
     unsafe {
         use windows::Win32::Graphics::Dwm::{DWMWA_USE_IMMERSIVE_DARK_MODE, DwmSetWindowAttribute};
         use windows::Win32::UI::WindowsAndMessaging::FindWindowW;
         use windows::core::w;
-
         if let Ok(hwnd) = FindWindowW(None, w!("DisplayWarp")) {
             if !hwnd.0.is_null() {
                 uxtheme::allow_dark_mode_for_window(hwnd, dark);
@@ -157,22 +142,50 @@ fn apply_window_dark_mode(dark: bool) {
     }
 }
 
-#[derive(Default, Clone)]
-pub struct TrayState {
-    pub warp_ids: Vec<MenuId>,
-    pub display_ids: Vec<MenuId>,
+fn cursor_pos() -> (i32, i32) {
+    unsafe {
+        use windows::Win32::Foundation::POINT;
+        use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+        let mut pt = POINT { x: 0, y: 0 };
+        let _ = GetCursorPos(&mut pt);
+        (pt.x, pt.y)
+    }
+}
+
+fn dpi_scale_at(x: i32, y: i32) -> f32 {
+    unsafe {
+        use windows::Win32::Foundation::POINT;
+        use windows::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromPoint};
+        use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
+        let pt = POINT { x, y };
+        let monitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+        let mut dpi_x: u32 = 96;
+        let mut dpi_y: u32 = 96;
+        let _ = GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y);
+        dpi_x as f32 / 96.0
+    }
+}
+
+pub struct PopupRequest {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+    pub dark: bool,
 }
 
 pub struct TrayItems {
-    tray: TrayIcon,
-    /// Shared with the background event thread — updated on every menu rebuild.
-    state: Arc<Mutex<TrayState>>,
+    _tray: TrayIcon,
+    pub popup_rx: mpsc::Receiver<PopupRequest>,
 }
 
 impl TrayItems {
-    pub fn refresh_menu(&self, profiles: &[AppProfile], layouts: &[SavedDisplayLayout]) {
+    pub fn refresh_menu(
+        &self,
+        _profiles: &[crate::models::AppProfile],
+        _layouts: &[crate::models::SavedDisplayLayout],
+    ) {
         let dark = is_dark_mode();
-
         if dark {
             uxtheme::set_preferred_app_mode(2);
         } else {
@@ -180,64 +193,17 @@ impl TrayItems {
         }
         uxtheme::flush_menu_themes();
         apply_window_dark_mode(dark);
-
-        let warp_icon = "▶️  ";
-        let display_icon = "▶️  ";
-        let empty_icon = "📂  ";
-
-        let show_item = MenuItem::new("👁  Show", true, None);
-        let quit_item = MenuItem::new("❌  Quit", true, None);
-        let menu = Menu::new();
-        let _ = menu.append(&show_item);
-        let _ = menu.append(&PredefinedMenuItem::separator());
-
-        let mut next_state = TrayState::default();
-
-        let warp_sub = Submenu::new("⚡  Warp Profiles", true);
-        if profiles.is_empty() {
-            let empty = MenuItem::new(format!("{}(No profiles)", empty_icon), false, None);
-            let _ = warp_sub.append(&empty);
-        } else {
-            for p in profiles {
-                let item = MenuItem::new(format!("{}{}", warp_icon, p.name), true, None);
-                next_state.warp_ids.push(item.id().clone());
-                let _ = warp_sub.append(&item);
-            }
-        }
-        let _ = menu.append(&warp_sub);
-
-        let disp_sub = Submenu::new("🖥  Display Profiles", true);
-        if layouts.is_empty() {
-            let empty = MenuItem::new(format!("{}(No layouts)", empty_icon), false, None);
-            let _ = disp_sub.append(&empty);
-        } else {
-            for l in layouts {
-                let item = MenuItem::new(format!("{}{}", display_icon, l.name), true, None);
-                next_state.display_ids.push(item.id().clone());
-                let _ = disp_sub.append(&item);
-            }
-        }
-        let _ = menu.append(&disp_sub);
-
-        let _ = menu.append(&PredefinedMenuItem::separator());
-        let _ = menu.append(&quit_item);
-
-        let _ = self.tray.set_tooltip(Some("DisplayWarp".to_string()));
-
-        *self.state.lock() = next_state;
-        self.tray.set_menu(Some(Box::new(menu)));
     }
 }
 
-/// Create the system-tray icon and context menu.
 pub fn create_tray(
     watcher_running: Arc<AtomicBool>,
     data: Arc<Mutex<SavedData>>,
-    status_message: Arc<Mutex<String>>,
-    status_log: Arc<Mutex<Vec<String>>>,
+    status_message: Arc<parking_lot::Mutex<String>>,
+    status_log: Arc<parking_lot::Mutex<Vec<String>>>,
+    ctx: egui::Context, // <-- takes egui context to wake up the main loop
 ) -> TrayItems {
     let dark = is_dark_mode();
-
     if dark {
         uxtheme::set_preferred_app_mode(2);
     } else {
@@ -245,128 +211,87 @@ pub fn create_tray(
     }
     uxtheme::flush_menu_themes();
 
-    let warp_icon = "▶️  ";
-    let display_icon = "▶️  ";
-    let empty_icon = "📂  ";
-
-    let show_item = MenuItem::new("👁  Show", true, None);
-    let quit_item = MenuItem::new("❌  Quit", true, None);
-    let show_id = show_item.id().clone();
-    let quit_id = quit_item.id().clone();
-
-    let menu = Menu::new();
-    let _ = menu.append(&show_item);
-    let _ = menu.append(&PredefinedMenuItem::separator());
-
-    let mut state = TrayState::default();
-
-    let (profiles_snapshot, layouts_snapshot) = {
-        let d = data.lock();
-        (d.profiles.clone(), d.display_profiles.clone())
-    };
-
-    let warp_sub = Submenu::new("⚡  Warp Profiles", true);
-    if profiles_snapshot.is_empty() {
-        let empty = MenuItem::new(format!("{}(No profiles)", empty_icon), false, None);
-        let _ = warp_sub.append(&empty);
-    } else {
-        for p in &profiles_snapshot {
-            let item = MenuItem::new(format!("{}{}", warp_icon, p.name), true, None);
-            state.warp_ids.push(item.id().clone());
-            let _ = warp_sub.append(&item);
-        }
-    }
-    let _ = menu.append(&warp_sub);
-
-    let disp_sub = Submenu::new("🖥  Display Profiles", true);
-    if layouts_snapshot.is_empty() {
-        let empty = MenuItem::new(format!("{}(No layouts)", empty_icon), false, None);
-        let _ = disp_sub.append(&empty);
-    } else {
-        for l in &layouts_snapshot {
-            let item = MenuItem::new(format!("{}{}", display_icon, l.name), true, None);
-            state.display_ids.push(item.id().clone());
-            let _ = disp_sub.append(&item);
-        }
-    }
-    let _ = menu.append(&disp_sub);
-
-    let _ = menu.append(&PredefinedMenuItem::separator());
-    let _ = menu.append(&quit_item);
-
     let icon = tray_icon();
     let tray = TrayIconBuilder::new()
-        .with_menu(Box::new(menu))
         .with_tooltip("DisplayWarp")
         .with_icon(icon)
         .build()
         .expect("failed to build tray icon");
 
-    let state_arc = Arc::new(Mutex::new(state));
-    let state_thread = Arc::clone(&state_arc);
+    let (popup_tx, popup_rx) = mpsc::channel::<PopupRequest>();
 
     std::thread::spawn(move || {
-        let receiver = MenuEvent::receiver();
+        let tray_receiver = TrayIconEvent::receiver();
         loop {
-            if let Ok(event) = receiver.recv() {
-                let id = event.id().clone();
-                if id == quit_id {
-                    watcher_running.store(false, Ordering::Relaxed);
-                    std::process::exit(0);
-                } else if id == show_id {
-                    show_window_native();
-                } else {
-                    let st = state_thread.lock().clone();
-
-                    // Check Warp Profiles
-                    let mut found = false;
-                    for (idx, pid) in st.warp_ids.iter().enumerate() {
-                        if id == *pid {
-                            found = true;
-                            let profile = {
-                                let d = data.lock();
-                                d.profiles.get(idx).cloned()
-                            };
-                            if let Some(p) = profile {
-                                crate::app::WindowManagerApp::launch_profile(
-                                    &p,
-                                    Arc::clone(&status_message),
-                                    Arc::clone(&status_log),
-                                );
-                            }
-                            break;
-                        }
+            if let Ok(event) = tray_receiver.recv() {
+                let is_click = matches!(
+                    event,
+                    tray_icon::TrayIconEvent::Click {
+                        button: tray_icon::MouseButton::Left,
+                        button_state: tray_icon::MouseButtonState::Up,
+                        ..
+                    } | tray_icon::TrayIconEvent::Click {
+                        button: tray_icon::MouseButton::Right,
+                        button_state: tray_icon::MouseButtonState::Up,
+                        ..
                     }
-                    if found {
-                        continue;
-                    }
-
-                    // Check Display Profiles
-                    for (idx, pid) in st.display_ids.iter().enumerate() {
-                        if id == *pid {
-                            let layout = {
-                                let d = data.lock();
-                                d.display_profiles.get(idx).cloned()
-                            };
-                            if let Some(l) = layout {
-                                crate::app::WindowManagerApp::apply_display_layout(
-                                    &l,
-                                    Arc::clone(&status_message),
-                                    Arc::clone(&status_log),
-                                );
-                            }
-                            break;
-                        }
-                    }
+                );
+                if !is_click {
+                    continue;
                 }
+
+                let (cx, cy) = cursor_pos();
+                let scale = dpi_scale_at(cx, cy);
+                let dark = is_dark_mode();
+
+                let popup_w = 230.0f32;
+                let popup_h = {
+                    let d = data.lock();
+                    let items = d.profiles.len().max(1) + d.display_profiles.len().max(1);
+                    (items as f32 * 28.0) + (2.0 * 24.0) + (3.0 * 9.0) + 28.0 + 28.0 + 12.0
+                };
+
+                let lx = cx as f32 / scale;
+                let ly = cy as f32 / scale;
+
+                let screen_w = unsafe {
+                    windows::Win32::UI::WindowsAndMessaging::GetSystemMetrics(
+                        windows::Win32::UI::WindowsAndMessaging::SM_CXSCREEN,
+                    ) as f32
+                        / scale
+                };
+                let screen_h = unsafe {
+                    windows::Win32::UI::WindowsAndMessaging::GetSystemMetrics(
+                        windows::Win32::UI::WindowsAndMessaging::SM_CYSCREEN,
+                    ) as f32
+                        / scale
+                };
+
+                let px = (lx - popup_w).max(0.0).min(screen_w - popup_w);
+                let py = (ly - popup_h).max(0.0).min(screen_h - popup_h);
+
+                let _ = popup_tx.send(PopupRequest {
+                    x: px,
+                    y: py,
+                    w: popup_w,
+                    h: popup_h,
+                    dark,
+                });
+
+                // Wake up the egui main loop so update() runs even if window is hidden
+                ctx.request_repaint();
             }
         }
     });
 
     TrayItems {
-        tray,
-        state: state_arc,
+        _tray: tray,
+        popup_rx,
     }
+}
+
+pub fn show_window_native_pub() {
+    show_window_native();
 }
 
 fn show_window_native() {

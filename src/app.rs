@@ -24,6 +24,7 @@ pub enum AppTab {
 pub struct WindowManagerApp {
     pub monitors: Vec<MonitorInfo>,
     pub display_targets: Vec<MonitorInfo>,
+    pub show_tray_popup: Option<crate::tray::PopupRequest>,
     /// Shared so the background watcher can read profiles.
     pub data: Arc<parking_lot::Mutex<SavedData>>,
     // ── Navigation ──
@@ -82,6 +83,7 @@ impl Default for WindowManagerApp {
 
         let mut app = Self {
             monitors: vec![],
+            show_tray_popup: None,
             display_targets: vec![],
             data: Arc::clone(&data),
             current_tab: AppTab::Warp,

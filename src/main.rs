@@ -109,6 +109,7 @@ fn main() -> eframe::Result {
                 app.data.clone(),
                 app.status_message.clone(),
                 app.status_log.clone(),
+                cc.egui_ctx.clone(), // <-- add this
             );
             app.tray = Some(tray_items);
             Ok(Box::new(app))
