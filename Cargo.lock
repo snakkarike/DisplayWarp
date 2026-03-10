@@ -12,6 +12,7 @@ dependencies = [
  "egui_commonmark",
  "egui_extras 0.30.0",
  "image",
+ "once_cell",
  "parking_lot",
  "rfd",
  "serde",
