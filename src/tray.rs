@@ -1,6 +1,6 @@
 use eframe::egui;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 use std::sync::mpsc;
 
 use parking_lot::Mutex;
@@ -172,6 +172,7 @@ pub struct PopupRequest {
     pub w: f32,
     pub h: f32,
     pub dark: bool,
+    pub frame_count: u32,
 }
 
 pub struct TrayItems {
@@ -197,10 +198,10 @@ impl TrayItems {
 }
 
 pub fn create_tray(
-    watcher_running: Arc<AtomicBool>,
+    _watcher_running: Arc<AtomicBool>,
     data: Arc<Mutex<SavedData>>,
-    status_message: Arc<parking_lot::Mutex<String>>,
-    status_log: Arc<parking_lot::Mutex<Vec<String>>>,
+    _status_message: Arc<parking_lot::Mutex<String>>,
+    _status_log: Arc<parking_lot::Mutex<Vec<String>>>,
     ctx: egui::Context, // <-- takes egui context to wake up the main loop
 ) -> TrayItems {
     let dark = is_dark_mode();
@@ -247,8 +248,34 @@ pub fn create_tray(
                 let popup_w = 230.0f32;
                 let popup_h = {
                     let d = data.lock();
-                    let items = d.profiles.len().max(1) + d.display_profiles.len().max(1);
-                    (items as f32 * 28.0) + (2.0 * 24.0) + (3.0 * 9.0) + 28.0 + 28.0 + 12.0
+                    let profile_rows = d.profiles.len().max(1) as f32;
+                    let layout_rows = d.display_profiles.len().max(1) as f32;
+                    // Row inventory (all allocate_exact_size heights):
+                    //   Show item:              28
+                    //   separator:               9
+                    //   "Warp Profiles" header: 24
+                    //   profile rows:           28 each
+                    //   separator:               9
+                    //   "Display Profiles" hdr: 24
+                    //   layout rows:            28 each
+                    //   separator:               9
+                    //   Quit item:              28
+                    // egui adds item_spacing.y (default ~4px) between each
+                    // allocate_exact_size call — count the gaps.
+                    let total_rows = 2.0   // Show + Quit
+                        + 2.0              // two section headers
+                        + 3.0             // three separators
+                        + profile_rows
+                        + layout_rows;
+                    let item_spacing = 4.0; // egui default item_spacing.y
+                    let gaps = (total_rows - 1.0) * item_spacing;
+                    let row_heights = 2.0 * 28.0          // Show + Quit
+                        + 2.0 * 24.0                      // headers
+                        + 3.0 * 9.0                       // separators
+                        + (profile_rows + layout_rows) * 28.0; // items
+                    // inner_margin symmetric(0,6) = 6 top + 6 bottom
+                    let margin = 12.0;
+                    row_heights + gaps + margin
                 };
 
                 let lx = cx as f32 / scale;
@@ -276,6 +303,7 @@ pub fn create_tray(
                     w: popup_w,
                     h: popup_h,
                     dark,
+                    frame_count: 0,
                 });
 
                 // Wake up the egui main loop so update() runs even if window is hidden

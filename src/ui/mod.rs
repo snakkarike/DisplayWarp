@@ -27,10 +27,22 @@ impl eframe::App for WindowManagerApp {
             }
         }
 
-        if let Some(req) = &self.show_tray_popup {
-            let dark = req.dark;
-            let pos = egui::pos2(req.x, req.y);
-            let size = egui::vec2(req.w, req.h);
+        // Extract all Arc clones and popup params before any mutable borrow of
+        // show_tray_popup, to avoid a simultaneous &mut self conflict.
+        let popup_params = self.show_tray_popup.as_ref().map(|req| {
+            (
+                req.dark,
+                egui::pos2(req.x, req.y),
+                egui::vec2(req.w, req.h),
+                req.frame_count,
+            )
+        });
+        if let Some(req) = self.show_tray_popup.as_mut() {
+            req.frame_count = req.frame_count.saturating_add(1);
+        }
+
+        if let Some((dark, pos, size, frame_count)) = popup_params {
+            let popup_ready = frame_count > 3;
             let data = Arc::clone(&self.data);
             let status_message = Arc::clone(&self.status_message);
             let status_log = Arc::clone(&self.status_log);
@@ -46,19 +58,29 @@ impl eframe::App for WindowManagerApp {
                     .with_transparent(true)
                     .with_always_on_top()
                     .with_resizable(false)
-                    .with_taskbar(false),
+                    .with_taskbar(false)
+                    .with_active(false),
                 |ctx, _class| {
+                    // Close on Escape
                     if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
                         close_popup = true;
                     }
-                    if ctx.input(|i| i.pointer.any_click()) {
-                        if let Some(click_pos) = ctx.input(|i| i.pointer.interact_pos()) {
-                            let screen = ctx.input(|i| {
-                                i.viewport().inner_rect.unwrap_or(egui::Rect::EVERYTHING)
-                            });
-                            if !screen.contains(click_pos) {
-                                close_popup = true;
+                    // Close on any mouse button press outside the popup.
+                    // Because the window is WS_EX_NOACTIVATE we won't receive
+                    // click events from outside, so we poll the Win32 async key
+                    // state for mouse buttons while the cursor is off the popup.
+                    if popup_ready {
+                        let cursor_inside = ctx.input(|i| {
+                            if let Some(pos) = i.pointer.hover_pos() {
+                                let rect =
+                                    i.viewport().inner_rect.unwrap_or(egui::Rect::EVERYTHING);
+                                rect.contains(pos)
+                            } else {
+                                false
                             }
+                        });
+                        if !cursor_inside && is_mouse_button_down_win32() {
+                            close_popup = true;
                         }
                     }
 
@@ -459,6 +481,38 @@ fn popup_separator(ui: &mut egui::Ui, color: egui::Color32) {
             ],
             egui::Stroke::new(1.0, color),
         );
+    }
+}
+
+// ─── Popup helpers ───────────────────────────────────────────────────────────
+
+/// Poll Win32 async mouse button state — works even when our window is
+/// WS_EX_NOACTIVATE and therefore doesn't receive WM_LBUTTONDOWN messages.
+fn is_mouse_button_down_win32() -> bool {
+    unsafe {
+        // GetAsyncKeyState is in user32 — load it dynamically to avoid
+        // needing the Win32_UI_Input feature flag.
+        // VK_LBUTTON = 0x01, VK_RBUTTON = 0x02
+        type FnGetAsyncKeyState = unsafe extern "system" fn(i32) -> i16;
+        let user32 = windows::Win32::System::LibraryLoader::LoadLibraryA(windows::core::PCSTR(
+            b"user32.dll".as_ptr(),
+        ))
+        .unwrap_or_default();
+        if user32.is_invalid() {
+            return false;
+        }
+        let f: Option<FnGetAsyncKeyState> =
+            std::mem::transmute(windows::Win32::System::LibraryLoader::GetProcAddress(
+                user32,
+                windows::core::PCSTR(b"GetAsyncKeyState".as_ptr()),
+            ));
+        if let Some(f) = f {
+            let l = f(0x01); // VK_LBUTTON
+            let r = f(0x02); // VK_RBUTTON
+            (l as u16 & 0x8000 != 0) || (r as u16 & 0x8000 != 0)
+        } else {
+            false
+        }
     }
 }
 
