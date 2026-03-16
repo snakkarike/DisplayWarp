@@ -92,7 +92,7 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                                 }
                                 if ui.button(format!("{} Change", regular::PENCIL_SIMPLE)).clicked() {
                                     if let Some(folder) = rfd::FileDialog::new().pick_folder() {
-                                        let exe_dir = std::env::current_exe()
+                                        let _exe_dir = std::env::current_exe()
                                             .unwrap_or_else(|_| std::path::PathBuf::from("."))
                                             .parent()
                                             .unwrap_or_else(|| std::path::Path::new("."))
@@ -104,8 +104,13 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                                             let _ = std::fs::copy(&config_path, &new_config_file);
                                         }
 
+                                        let config_base = crate::app::WindowManagerApp::get_config_base_dir();
+                                        if !config_base.exists() {
+                                            let _ = std::fs::create_dir_all(&config_base);
+                                        }
+
                                         let _ = std::fs::write(
-                                            exe_dir.join("config_location.txt"),
+                                            config_base.join("config_location.txt"),
                                             folder.to_string_lossy().as_ref(),
                                         );
 

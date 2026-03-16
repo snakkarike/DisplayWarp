@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use windows::Win32::Foundation::{HWND, RECT};
 use windows::Win32::Graphics::Gdi::{MONITOR_DEFAULTTONEAREST, MonitorFromWindow};
+use windows::Win32::UI::Shell::{FOLDERID_Documents, KF_FLAG_DEFAULT, SHGetKnownFolderPath};
 
 use crate::models::{AppProfile, MonitorInfo, SavedData};
 use crate::monitor::get_all_monitors;
@@ -152,34 +153,7 @@ impl WindowManagerApp {
             l.remove(0);
         }
 
-        // Trigger native Windows Toast Notification for important events
-        let should_toast = msg.starts_with("✅")
-            || msg.starts_with("❌")
-            || msg.starts_with("⚠️")
-            || msg.starts_with("🚀")
-            || msg.starts_with("🗑")
-            || msg.starts_with("📦")
-            || msg.starts_with("📁")
-            || msg.starts_with("⚙️");
-
-        if should_toast {
-            // Strip the emoji prefix for the toast title/text if we want,
-            // or just show the whole thing. Let's show the whole thing as text1.
-            let toast_msg = msg.clone();
-            std::thread::spawn(move || {
-                #[cfg(windows)]
-                {
-                    use winrt_notification::{Duration, Sound, Toast};
-                    // Use a generic App ID since we don't have a registered one
-                    let _ = Toast::new(Toast::POWERSHELL_APP_ID)
-                        .title("DisplayWarp")
-                        .text1(&toast_msg)
-                        .sound(Some(Sound::SMS))
-                        .duration(Duration::Short)
-                        .show();
-                }
-            });
-        }
+        // Removed native Windows Toast Notification logic as requested by user.
     }
 
     /// Returns current local time as HH:MM:SS string for log timestamps.
@@ -216,25 +190,94 @@ impl WindowManagerApp {
         }
     }
 
-    pub fn get_config_path() -> std::path::PathBuf {
+    pub fn get_config_base_dir() -> std::path::PathBuf {
         let exe_dir = std::env::current_exe()
             .unwrap_or_else(|_| std::path::PathBuf::from("."))
             .parent()
             .unwrap_or_else(|| std::path::Path::new("."))
             .to_path_buf();
 
-        if let Ok(content) = std::fs::read_to_string(exe_dir.join("config_location.txt")) {
+        let mut documents_path = None;
+        #[cfg(windows)]
+        {
+            unsafe {
+                if let Ok(path) = SHGetKnownFolderPath(&FOLDERID_Documents, KF_FLAG_DEFAULT, None) {
+                    if let Ok(path_str) = path.to_string() {
+                        documents_path = Some(std::path::PathBuf::from(path_str));
+                    }
+                    windows::Win32::System::Com::CoTaskMemFree(Some(path.as_ptr() as *mut _));
+                }
+            }
+        }
+
+        let base_dir = documents_path.unwrap_or_else(|| {
+            // Fallback to user home if Documents not found via shell API
+            #[cfg(windows)]
+            {
+                if let Ok(profile) = std::env::var("USERPROFILE") {
+                    let p = std::path::PathBuf::from(profile).join("Documents");
+                    if p.exists() {
+                        return p;
+                    }
+                }
+            }
+            exe_dir.clone()
+        });
+
+        base_dir.join("DisplayWarp")
+    }
+
+    pub fn get_config_path() -> std::path::PathBuf {
+        let config_base = Self::get_config_base_dir();
+        if !config_base.exists() {
+            let _ = std::fs::create_dir_all(&config_base);
+        }
+
+        let exe_dir = std::env::current_exe()
+            .unwrap_or_else(|_| std::path::PathBuf::from("."))
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .to_path_buf();
+
+        // Migration: Check for manual override in config_location.txt
+        let legacy_txt = exe_dir.join("config_location.txt");
+        let new_txt = config_base.join("config_location.txt");
+
+        if legacy_txt.exists() && !new_txt.exists() {
+            let _ = std::fs::copy(&legacy_txt, &new_txt);
+        }
+
+        if let Ok(content) = std::fs::read_to_string(&new_txt) {
             let path = std::path::PathBuf::from(content.trim());
             if path.is_dir() {
                 return path.join("monitor_config.json");
             }
         }
 
-        exe_dir.join("monitor_config.json")
+        config_base.join("monitor_config.json")
     }
 
     pub fn load_data(&mut self) {
-        if let Ok(bytes) = std::fs::read(Self::get_config_path()) {
+        let config_path = Self::get_config_path();
+
+        // Migration: If new config doesn't exist, but legacy config in exe dir does, migration!
+        if !config_path.exists() {
+            let exe_dir = std::env::current_exe()
+                .unwrap_or_else(|_| std::path::PathBuf::from("."))
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new("."))
+                .to_path_buf();
+            let legacy_path = exe_dir.join("monitor_config.json");
+
+            if legacy_path.exists() {
+                if let Ok(bytes) = std::fs::read(&legacy_path) {
+                    let _ = std::fs::write(&config_path, bytes);
+                    // Optional: remove legacy? Better to keep as backup for now.
+                }
+            }
+        }
+
+        if let Ok(bytes) = std::fs::read(&config_path) {
             if let Ok(decoded) = serde_json::from_slice::<SavedData>(&bytes) {
                 *self.data.lock() = decoded;
             }
