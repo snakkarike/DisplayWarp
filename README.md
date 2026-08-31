@@ -113,3 +113,11 @@ You can edit this file by hand — changes take effect on next launch.
 ## License
 
 MIT
+
+<div>
+  <i>*Maintained with ❤️ for the PC community.*</i>
+  <br/><br/>
+  <a href="https://buymeacoffee.com/snakkarike" target="_blank">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 40px !important;width: 145px !important;" >
+  </a>
+</div>
