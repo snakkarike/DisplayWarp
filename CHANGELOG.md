@@ -119,9 +119,9 @@
 ### Changed
 
 - **Major Dependency Updates**:
-  - [windows](cci:1://file:///g:/Github/DisplayWarp/src/window.rs:342:0-355:1) crate: `0.58` → `0.62`
+  - `windows` crate: `0.58` → `0.62`
 
-  - [eframe](cci:1://file:///g:/Github/DisplayWarp/src/ui/mod.rs:412:0-421:1) / `egui`: `0.29` → `0.33`
+  - `eframe` / `egui`: `0.29` → `0.33`
 
   - `egui-phosphor`: `0.7` → `0.11`
 
@@ -141,7 +141,7 @@
 - **Windows API Modernization**:
   - Refactored `Win32` imports to use `windows::core::BOOL` (handling the removal of `BOOL/TRUE/FALSE` from `Foundation`).
 
-  - Updated API call signatures for `IsWindow`, `SetWindowPos`, `EnumDisplayMonitors`, and `ChangeDisplaySettingsExW` to match [windows](cci:1://file:///g:/Github/DisplayWarp/src/window.rs:342:0-355:1) v0.62 requirements.
+  - Updated API call signatures for `IsWindow`, `SetWindowPos`, `EnumDisplayMonitors`, and `ChangeDisplaySettingsExW` to match `windows` v0.62 requirements.
 
 ### Fixed
 

@@ -152,6 +152,18 @@ pub fn apply_window_dark_mode(dark: bool) {
                     &value as *const u32 as *const _,
                     std::mem::size_of::<u32>() as u32,
                 );
+                use windows::Win32::UI::WindowsAndMessaging::{
+                    SetWindowPos, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+                };
+                let _ = SetWindowPos(
+                    hwnd,
+                    None,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+                );
             }
         }
     }

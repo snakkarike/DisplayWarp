@@ -94,7 +94,8 @@ impl eframe::App for WindowManagerApp {
             });
 
         // ── Central: everything else ─────────────────────────────────────
-        ui.add_space(2.0);
+        egui::CentralPanel::default().show(ui, |ui| {
+            ui.add_space(2.0);
 
             // Tab Bar with Logo
             ui.horizontal(|ui| {
@@ -203,14 +204,15 @@ impl eframe::App for WindowManagerApp {
                         });
                 }
                 AppTab::Settings => {
-                    egui::ScrollArea::vertical()
-                        .auto_shrink([false; 2])
-                        .id_salt("settings_scroll")
-                        .show(ui, |ui| {
-                            settings_tab::draw_settings_tab(self, ui);
-                        });
+                    let available_h = ui.available_rect_before_wrap().height();
+                    settings_tab::draw_settings_tab(self, ui, available_h);
                 }
             }
+        });
+    }
+
+    fn clear_color(&self, visuals: &egui::Visuals) -> [f32; 4] {
+        visuals.window_fill.to_normalized_gamma_f32()
     }
 }
 

@@ -3,9 +3,9 @@ use crate::ui::icons::regular;
 
 use crate::app::WindowManagerApp;
 
-pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
+pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available_h: f32) {
     ui.columns(2, |cols| {
-        let col_height = 400.0;
+        let col_height = (available_h - 8.0).max(650.0);
         // Col 1: Settings
         cols[0].vertical(|ui| {
             ui.set_min_height(col_height);
@@ -397,56 +397,250 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                     );
                     ui.add_space(8.0);
 
-                    if app.dark_mode {
-                        ui.add(
-                            egui::Image::new(egui::include_image!("../../assets/DisplayWarpLogoWhite.png"))
-                                .max_width(200.0)
-                                .maintain_aspect_ratio(true),
-                        );
+                    let logo_option = if app.dark_mode {
+                        &app.logo_texture_white
                     } else {
-                        ui.add(
-                            egui::Image::new(egui::include_image!("../../assets/DisplayWarpLogoBlack.png"))
-                                .max_width(200.0)
-                                .maintain_aspect_ratio(true),
-                        );
+                        &app.logo_texture
+                    };
+                    if let Some(tex) = logo_option {
+                        ui.image(egui::load::SizedTexture::new(
+                            tex.id(),
+                            egui::vec2(192.0, 30.0),
+                        ));
                     }
-                    ui.add_space(8.0);
+                    ui.add_space(6.0);
 
-                    ui.label(egui::RichText::new("DisplayWarp").size(20.0).strong());
                     ui.label(
                         egui::RichText::new(format!("Version: v{}", env!("CARGO_PKG_VERSION")))
-                            .color(egui::Color32::GRAY),
+                            .small()
+                            .color(if app.dark_mode {
+                                egui::Color32::from_gray(160)
+                            } else {
+                                egui::Color32::from_gray(100)
+                            }),
+                    );
+                    ui.add_space(4.0);
+                    ui.label(
+                        egui::RichText::new(
+                            "A tool for easily moving running applications exactly between virtual/real displays.",
+                        )
+                        .color(if app.dark_mode {
+                            egui::Color32::from_gray(200)
+                        } else {
+                            egui::Color32::from_gray(70)
+                        }),
                     );
                     ui.add_space(12.0);
-                    ui.label("A tool for easily moving running applications exactly between virtual/real displays.");
-                    ui.add_space(16.0);
 
                     ui.separator();
                     ui.add_space(8.0);
-                    ui.label(egui::RichText::new("Latest Release Changelog").strong());
-                    ui.add_space(4.0);
+                    ui.label(
+                        egui::RichText::new(format!("{} Latest Release Changelog", regular::FILE))
+                            .strong(),
+                    );
+                    ui.add_space(6.0);
 
                     egui::ScrollArea::vertical()
                         .id_salt("changelog_scroll")
-                        .auto_shrink([false; 2])
+                        .auto_shrink([false, false])
                         .show(ui, |ui| {
                             for line in include_str!("../../CHANGELOG.md").lines() {
-                                if line.starts_with("# ") {
-                                    ui.heading(&line[2..]);
-                                } else if line.starts_with("## ") {
-                                    ui.label(egui::RichText::new(&line[3..]).strong().size(14.0));
-                                } else if line.starts_with("### ") {
-                                    ui.label(egui::RichText::new(&line[4..]).strong());
-                                } else if line.starts_with("- ") {
-                                    ui.label(format!("  • {}", &line[2..]));
-                                } else if line.trim().is_empty() {
-                                    ui.add_space(4.0);
-                                } else {
-                                    ui.label(line);
-                                }
+                                render_markdown_line(ui, line, app.dark_mode);
                             }
                         });
                 });
         });
     });
+}
+
+fn render_markdown_line(ui: &mut egui::Ui, line: &str, dark_mode: bool) {
+    let line = line.trim_end();
+    if line.starts_with("# ") {
+        ui.add_space(8.0);
+        ui.add(egui::Label::new(egui::RichText::new(&line[2..]).size(16.0).strong()).wrap());
+        ui.add_space(2.0);
+    } else if line.starts_with("## ") {
+        ui.add_space(8.0);
+        ui.add(egui::Label::new(egui::RichText::new(&line[3..]).size(14.0).strong()).wrap());
+        ui.add_space(2.0);
+    } else if line.starts_with("### ") {
+        ui.add_space(6.0);
+        ui.add(
+            egui::Label::new(
+                egui::RichText::new(&line[4..])
+                    .strong()
+                    .size(13.0)
+                    .color(if dark_mode {
+                        egui::Color32::from_rgb(147, 197, 253)
+                    } else {
+                        egui::Color32::from_rgb(37, 99, 235)
+                    }),
+            )
+            .wrap(),
+        );
+        ui.add_space(2.0);
+    } else if line.starts_with("---") {
+        ui.add_space(4.0);
+        ui.separator();
+        ui.add_space(4.0);
+    } else if let Some(bullet) = line.strip_prefix("- ") {
+        let max_w = ui.available_width().max(80.0);
+        let job = build_formatted_job(bullet, "• ", dark_mode, max_w, ui.style());
+        ui.add(egui::Label::new(job).wrap());
+    } else if let Some(sub_bullet) = line.strip_prefix("  - ") {
+        let max_w = ui.available_width().max(80.0);
+        let job = build_formatted_job(sub_bullet, "    ⁃ ", dark_mode, max_w, ui.style());
+        ui.add(egui::Label::new(job).wrap());
+    } else if !line.trim().is_empty() {
+        let max_w = ui.available_width().max(80.0);
+        let job = build_formatted_job(line, "", dark_mode, max_w, ui.style());
+        ui.add(egui::Label::new(job).wrap());
+    } else {
+        ui.add_space(3.0);
+    }
+}
+
+fn build_formatted_job(
+    text: &str,
+    prefix: &str,
+    dark_mode: bool,
+    max_width: f32,
+    style: &egui::Style,
+) -> egui::text::LayoutJob {
+    use egui::text::{LayoutJob, TextFormat};
+
+    let mut job = LayoutJob::default();
+    job.wrap.max_width = max_width;
+    job.wrap.max_rows = usize::MAX;
+    job.wrap.break_anywhere = false;
+
+    let base_color = if dark_mode {
+        egui::Color32::from_gray(210)
+    } else {
+        egui::Color32::from_gray(40)
+    };
+    let bullet_color = if dark_mode {
+        egui::Color32::from_rgb(167, 139, 250)
+    } else {
+        egui::Color32::from_rgb(124, 58, 237)
+    };
+    let code_fg = if dark_mode {
+        egui::Color32::from_rgb(244, 114, 182)
+    } else {
+        egui::Color32::from_rgb(190, 24, 93)
+    };
+    let code_bg = if dark_mode {
+        egui::Color32::from_rgb(45, 45, 45)
+    } else {
+        egui::Color32::from_rgb(226, 232, 240)
+    };
+
+    let font_normal = egui::TextStyle::Body.resolve(style);
+    let mut font_bold = font_normal.clone();
+    font_bold.size += 0.5;
+
+    let font_mono = egui::TextStyle::Monospace.resolve(style);
+
+    if !prefix.is_empty() {
+        job.append(
+            prefix,
+            0.0,
+            TextFormat {
+                font_id: font_normal.clone(),
+                color: bullet_color,
+                ..Default::default()
+            },
+        );
+    }
+
+    let mut rest = text;
+    while !rest.is_empty() {
+        if let Some(stripped) = rest.strip_prefix("**") {
+            if let Some(end_idx) = stripped.find("**") {
+                let bold_text = &stripped[..end_idx];
+                job.append(
+                    bold_text,
+                    0.0,
+                    TextFormat {
+                        font_id: font_bold.clone(),
+                        color: if dark_mode {
+                            egui::Color32::WHITE
+                        } else {
+                            egui::Color32::BLACK
+                        },
+                        ..Default::default()
+                    },
+                );
+                rest = &stripped[end_idx + 2..];
+                continue;
+            }
+        }
+        if let Some(stripped) = rest.strip_prefix('`') {
+            if let Some(end_idx) = stripped.find('`') {
+                let code_text = &stripped[..end_idx];
+                job.append(
+                    code_text,
+                    0.0,
+                    TextFormat {
+                        font_id: font_mono.clone(),
+                        color: code_fg,
+                        background: code_bg,
+                        ..Default::default()
+                    },
+                );
+                rest = &stripped[end_idx + 1..];
+                continue;
+            }
+        }
+        if let Some(stripped) = rest.strip_prefix('[') {
+            if let Some(close_bracket) = stripped.find(']') {
+                let link_text = &stripped[..close_bracket];
+                let remainder = &stripped[close_bracket + 1..];
+                if remainder.starts_with('(') {
+                    if let Some(close_paren) = remainder.find(')') {
+                        job.append(
+                            link_text,
+                            0.0,
+                            TextFormat {
+                                font_id: font_bold.clone(),
+                                color: if dark_mode {
+                                    egui::Color32::from_rgb(147, 197, 253)
+                                } else {
+                                    egui::Color32::from_rgb(37, 99, 235)
+                                },
+                                ..Default::default()
+                            },
+                        );
+                        rest = &remainder[close_paren + 1..];
+                        continue;
+                    }
+                }
+            }
+        }
+        let next_bold = rest.find("**").unwrap_or(rest.len());
+        let next_code = rest.find('`').unwrap_or(rest.len());
+        let next_link = rest.find('[').unwrap_or(rest.len());
+        let next_delim = if next_bold == 0 {
+            2.min(rest.len())
+        } else if next_code == 0 || next_link == 0 {
+            1.min(rest.len())
+        } else {
+            next_bold.min(next_code).min(next_link)
+        };
+        let plain = &rest[..next_delim];
+        if !plain.is_empty() {
+            job.append(
+                plain,
+                0.0,
+                TextFormat {
+                    font_id: font_normal.clone(),
+                    color: base_color,
+                    ..Default::default()
+                },
+            );
+        }
+        rest = &rest[next_delim..];
+    }
+
+    job
 }

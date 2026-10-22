@@ -56,79 +56,147 @@ pub fn draw_shortcuts_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availab
                             );
                         });
 
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
-                            if ui
-                                .button(format!("{} Refresh", regular::ARROWS_CLOCKWISE))
-                                .on_hover_text("Re-scan desktop shortcuts from Windows Explorer")
-                                .clicked()
-                            {
-                                app.refresh_desktop_shortcuts();
-                            }
+                        let cat_w = 104.0;
+                        let ref_w = 90.0;
+                        let item_spacing = ui.spacing().item_spacing.x;
+                        let total_btns_w = cat_w + ref_w + item_spacing;
+                        let space = (ui.available_width() - total_btns_w).max(0.0);
+                        ui.add_space(space);
 
-                            let cat_btn = egui::Button::new(format!("{} Categories", regular::TAG))
-                                .fill(if app.managing_categories {
-                                    if app.dark_mode {
-                                        egui::Color32::from_rgb(109, 40, 217)
-                                    } else {
-                                        egui::Color32::from_rgb(124, 58, 237)
-                                    }
+                        let cat_btn = egui::Button::new(format!("{} Categories", regular::TAG))
+                            .fill(if app.managing_categories {
+                                if app.dark_mode {
+                                    egui::Color32::from_rgb(109, 40, 217)
                                 } else {
-                                    egui::Color32::TRANSPARENT
-                                });
+                                    egui::Color32::from_rgb(124, 58, 237)
+                                }
+                            } else {
+                                if app.dark_mode {
+                                    egui::Color32::from_rgb(42, 42, 42)
+                                } else {
+                                    egui::Color32::from_rgb(226, 232, 240)
+                                }
+                            });
 
-                            if ui
-                                .add(cat_btn)
-                                .on_hover_text("Manage custom categories and color codes")
-                                .clicked()
-                            {
-                                app.managing_categories = !app.managing_categories;
-                            }
-                        });
+                        if ui
+                            .add_sized([cat_w, 28.0], cat_btn)
+                            .on_hover_text("Manage custom categories and color codes")
+                            .clicked()
+                        {
+                            app.managing_categories = !app.managing_categories;
+                        }
+
+                        if ui
+                            .add_sized(
+                                [ref_w, 28.0],
+                                egui::Button::new(format!("{} Refresh", regular::ARROWS_CLOCKWISE)),
+                            )
+                            .on_hover_text("Re-scan desktop shortcuts from Windows Explorer")
+                            .clicked()
+                        {
+                            app.refresh_desktop_shortcuts();
+                        }
                     });
 
                     ui.add_space(8.0);
 
                     // Category Manager Panel (Collapsible)
                     if app.managing_categories {
+                        let categories = app.data.lock().shortcut_categories.clone();
+                        let assignments = app.data.lock().shortcut_category_assignments.clone();
+
                         egui::Frame::group(ui.style())
                             .inner_margin(egui::Margin::same(12))
                             .corner_radius(egui::CornerRadius::same(8))
                             .fill(if app.dark_mode {
-                                egui::Color32::from_rgb(30, 30, 30)
+                                egui::Color32::from_rgb(28, 28, 28)
                             } else {
                                 egui::Color32::from_rgb(243, 244, 246)
                             })
                             .stroke(egui::Stroke::new(
                                 1.0_f32,
                                 if app.dark_mode {
-                                    egui::Color32::from_rgb(60, 60, 60)
+                                    egui::Color32::from_rgb(48, 48, 48)
                                 } else {
-                                    egui::Color32::from_rgb(209, 213, 219)
+                                    egui::Color32::from_rgb(222, 226, 230)
                                 },
                             ))
                             .show(ui, |ui| {
                                 ui.set_width(ui.available_width());
 
+                                // ── Header ──
                                 ui.horizontal(|ui| {
-                                    ui.label(
-                                        egui::RichText::new(format!("{} Manage Shortcut Categories", regular::TAG))
-                                            .strong()
-                                            .size(14.0),
-                                    );
-                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                        if ui.button(regular::X).on_hover_text("Close").clicked() {
-                                            app.managing_categories = false;
-                                        }
+                                    ui.vertical(|ui| {
+                                        ui.horizontal(|ui| {
+                                            ui.spacing_mut().item_spacing.x = 8.0;
+                                            ui.label(
+                                                egui::RichText::new(format!("{} Manage Shortcut Categories", regular::TAG))
+                                                    .strong()
+                                                    .size(14.5),
+                                            );
+
+                                            let count_text = format!("{} categories", categories.len());
+                                            egui::Frame::new()
+                                                .fill(if app.dark_mode {
+                                                    egui::Color32::from_rgb(42, 42, 42)
+                                                } else {
+                                                    egui::Color32::from_rgb(226, 232, 240)
+                                                })
+                                                .corner_radius(egui::CornerRadius::same(10))
+                                                .inner_margin(egui::Margin::symmetric(7, 2))
+                                                .show(ui, |ui| {
+                                                    ui.label(
+                                                        egui::RichText::new(count_text)
+                                                            .size(11.0)
+                                                            .color(if app.dark_mode {
+                                                                egui::Color32::from_gray(170)
+                                                            } else {
+                                                                egui::Color32::from_gray(80)
+                                                            }),
+                                                    );
+                                                });
+                                        });
+
+                                        ui.label(
+                                            egui::RichText::new("Color-code and organize desktop shortcuts into custom groups.")
+                                                .small()
+                                                .color(if app.dark_mode {
+                                                    egui::Color32::from_gray(140)
+                                                } else {
+                                                    egui::Color32::from_gray(100)
+                                                }),
+                                        );
                                     });
+
+                                    let close_btn_w = 26.0;
+                                    let space = (ui.available_width() - close_btn_w).max(0.0);
+                                    ui.add_space(space);
+
+                                    let close_btn = egui::Button::new(
+                                        egui::RichText::new(regular::X).size(13.0)
+                                    )
+                                    .fill(if app.dark_mode {
+                                        egui::Color32::from_rgb(40, 40, 40)
+                                    } else {
+                                        egui::Color32::from_rgb(226, 232, 240)
+                                    })
+                                    .corner_radius(egui::CornerRadius::same(6));
+
+                                    if ui
+                                        .add_sized([close_btn_w, close_btn_w], close_btn)
+                                        .on_hover_text("Close category manager")
+                                        .clicked()
+                                    {
+                                        app.managing_categories = false;
+                                    }
                                 });
 
-                                ui.add_space(6.0);
+                                ui.add_space(10.0);
 
-                                let categories = app.data.lock().shortcut_categories.clone();
-                                let assignments = app.data.lock().shortcut_category_assignments.clone();
-
+                                // ── Existing Categories Pills ──
                                 if categories.is_empty() {
                                     ui.horizontal(|ui| {
+                                        ui.spacing_mut().item_spacing.x = 8.0;
                                         ui.label(
                                             egui::RichText::new("No categories defined yet.")
                                                 .small()
@@ -143,35 +211,117 @@ pub fn draw_shortcuts_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availab
                                     });
                                 } else {
                                     ui.horizontal_wrapped(|ui| {
-                                        ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
+                                        ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
                                         let mut cat_to_delete: Option<String> = None;
+                                        let mut cat_to_filter: Option<String> = None;
+
                                         for cat in &categories {
                                             let count = assignments.values().filter(|v| *v == &cat.id).count();
-                                            let bg_color = cat.color32().linear_multiply(0.2);
-                                            let border_color = cat.color32();
+                                            let color = cat.color32();
+                                            let is_active_filter = app.shortcut_category_filter.as_deref() == Some(&cat.id);
+
+                                            let bg_color = if is_active_filter {
+                                                if app.dark_mode {
+                                                    color.linear_multiply(0.35)
+                                                } else {
+                                                    color.linear_multiply(0.25)
+                                                }
+                                            } else {
+                                                if app.dark_mode {
+                                                    color.linear_multiply(0.15)
+                                                } else {
+                                                    color.linear_multiply(0.10)
+                                                }
+                                            };
+
+                                            let border_color = if is_active_filter {
+                                                color
+                                            } else {
+                                                if app.dark_mode {
+                                                    color.linear_multiply(0.50)
+                                                } else {
+                                                    color.linear_multiply(0.40)
+                                                }
+                                            };
+
+                                            let stroke_w = if is_active_filter { 1.5_f32 } else { 1.0_f32 };
 
                                             egui::Frame::new()
                                                 .fill(bg_color)
-                                                .stroke(egui::Stroke::new(1.0_f32, border_color))
-                                                .corner_radius(egui::CornerRadius::same(6))
-                                                .inner_margin(egui::Margin::symmetric(8, 4))
+                                                .stroke(egui::Stroke::new(stroke_w, border_color))
+                                                .corner_radius(egui::CornerRadius::same(14))
+                                                .inner_margin(egui::Margin::symmetric(10, 4))
                                                 .show(ui, |ui| {
                                                     ui.horizontal(|ui| {
-                                                        ui.label(
-                                                            egui::RichText::new("●").color(cat.color32()),
-                                                        );
-                                                        ui.label(
-                                                            egui::RichText::new(&cat.name)
-                                                                .strong()
-                                                                .small(),
-                                                        );
-                                                        ui.label(
-                                                            egui::RichText::new(format!("({})", count))
-                                                                .small()
-                                                                .color(egui::Color32::GRAY),
-                                                        );
+                                                        ui.spacing_mut().item_spacing.x = 6.0;
+
+                                                        // Color Dot
+                                                        ui.label(egui::RichText::new("●").size(12.0).color(color));
+
+                                                        // Category Name (Click to toggle filter)
+                                                        let name_resp = ui.add(
+                                                            egui::Label::new(
+                                                                egui::RichText::new(&cat.name)
+                                                                    .strong()
+                                                                    .small()
+                                                                    .color(if app.dark_mode {
+                                                                        egui::Color32::WHITE
+                                                                    } else {
+                                                                        egui::Color32::BLACK
+                                                                    }),
+                                                            )
+                                                            .sense(egui::Sense::click()),
+                                                        )
+                                                        .on_hover_text(if is_active_filter {
+                                                            "Active filter — click to clear filter"
+                                                        } else {
+                                                            "Click to filter shortcuts by this category"
+                                                        });
+
+                                                        if name_resp.clicked() {
+                                                            if is_active_filter {
+                                                                cat_to_filter = Some("clear".to_string());
+                                                            } else {
+                                                                cat_to_filter = Some(cat.id.clone());
+                                                            }
+                                                        }
+
+                                                        // Counter Pill
+                                                        let counter_bg = if app.dark_mode {
+                                                            egui::Color32::from_black_alpha(80)
+                                                        } else {
+                                                            egui::Color32::from_white_alpha(180)
+                                                        };
+                                                        egui::Frame::new()
+                                                            .fill(counter_bg)
+                                                            .corner_radius(egui::CornerRadius::same(8))
+                                                            .inner_margin(egui::Margin::symmetric(6, 1))
+                                                            .show(ui, |ui| {
+                                                                ui.label(
+                                                                    egui::RichText::new(format!("{}", count))
+                                                                        .size(10.5)
+                                                                        .color(if app.dark_mode {
+                                                                            egui::Color32::from_gray(190)
+                                                                        } else {
+                                                                            egui::Color32::from_gray(60)
+                                                                        }),
+                                                                );
+                                                            });
+
+                                                        // Delete frameless button
+                                                        let del_btn = egui::Button::new(
+                                                            egui::RichText::new(regular::TRASH)
+                                                                .size(12.0)
+                                                                .color(if app.dark_mode {
+                                                                    egui::Color32::from_gray(160)
+                                                                } else {
+                                                                    egui::Color32::from_gray(100)
+                                                                }),
+                                                        )
+                                                        .frame(false);
+
                                                         if ui
-                                                            .small_button(regular::TRASH)
+                                                            .add(del_btn)
                                                             .on_hover_text(format!("Delete category '{}'", cat.name))
                                                             .clicked()
                                                         {
@@ -180,60 +330,180 @@ pub fn draw_shortcuts_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availab
                                                     });
                                                 });
                                         }
+
                                         if let Some(id) = cat_to_delete {
+                                            if app.shortcut_category_filter.as_deref() == Some(&id) {
+                                                app.shortcut_category_filter = None;
+                                            }
                                             app.delete_shortcut_category(&id);
+                                        }
+
+                                        if let Some(id) = cat_to_filter {
+                                            if id == "clear" {
+                                                app.shortcut_category_filter = None;
+                                            } else {
+                                                app.shortcut_category_filter = Some(id);
+                                            }
                                         }
                                     });
                                 }
 
                                 ui.add_space(8.0);
                                 ui.separator();
-                                ui.add_space(6.0);
+                                ui.add_space(8.0);
 
+                                // ── Add New Category (Row 1: Input + Add Button) ──
                                 ui.horizontal(|ui| {
-                                    ui.spacing_mut().item_spacing.x = 6.0;
-                                    ui.label(egui::RichText::new("New Category:").small().strong());
+                                    ui.spacing_mut().item_spacing.x = 8.0;
+
+                                    let active_color = crate::models::parse_hex_color(&app.new_category_color)
+                                        .unwrap_or(egui::Color32::from_rgb(16, 185, 129));
+
+                                    ui.label(egui::RichText::new("●").size(18.0).color(active_color));
+
+                                    let btn_w = 110.0;
+                                    let preview_w = 24.0;
+                                    let text_w = (ui.available_width() - btn_w - preview_w - 16.0).max(140.0);
+
+                                    let can_add = !app.new_category_name.trim().is_empty();
 
                                     let resp = ui.add_sized(
-                                        [120.0, 26.0],
+                                        [text_w, 28.0],
                                         egui::TextEdit::singleline(&mut app.new_category_name)
-                                            .hint_text("Category name...")
-                                            .margin(egui::Margin::symmetric(8, 4)),
+                                            .hint_text("Category name (e.g. Work, Gaming, Creative)...")
+                                            .margin(egui::Margin::symmetric(10, 5)),
                                     );
 
                                     let enter = resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
 
-                                    // Palette swatches
-                                    for &(name, hex) in crate::models::PRESET_CATEGORY_COLORS {
-                                        let color = crate::models::parse_hex_color(hex).unwrap_or(egui::Color32::WHITE);
-                                        let is_active = app.new_category_color == hex;
-
-                                        let (rect, response) = ui.allocate_exact_size(egui::vec2(18.0, 18.0), egui::Sense::click());
-                                        if response.clicked() {
-                                            app.new_category_color = hex.to_string();
+                                    let add_btn = egui::Button::new(
+                                        egui::RichText::new(format!("{} Add", regular::PLUS))
+                                            .color(if can_add {
+                                                egui::Color32::WHITE
+                                            } else {
+                                                egui::Color32::from_gray(140)
+                                            }),
+                                    )
+                                    .fill(if can_add {
+                                        if app.dark_mode {
+                                            egui::Color32::from_rgb(109, 40, 217)
+                                        } else {
+                                            egui::Color32::from_rgb(124, 58, 237)
                                         }
-                                        let painter = ui.painter();
-                                        painter.circle_filled(rect.center(), 7.0, color);
-                                        if is_active {
-                                            painter.circle_stroke(
-                                                rect.center(),
-                                                9.0,
-                                                egui::Stroke::new(2.0_f32, if app.dark_mode { egui::Color32::WHITE } else { egui::Color32::BLACK }),
-                                            );
+                                    } else {
+                                        if app.dark_mode {
+                                            egui::Color32::from_rgb(45, 45, 45)
+                                        } else {
+                                            egui::Color32::from_rgb(220, 225, 230)
                                         }
-                                        response.on_hover_text(name);
-                                    }
+                                    });
 
-                                    let can_add = !app.new_category_name.trim().is_empty();
-                                    if ui
-                                        .add_enabled(can_add, egui::Button::new(format!("{} Add", regular::PLUS)))
-                                        .clicked() || (enter && can_add)
-                                    {
+                                    let add_clicked = ui
+                                        .add_sized([btn_w, 28.0], add_btn)
+                                        .on_hover_text(if can_add {
+                                            "Add this category"
+                                        } else {
+                                            "Enter a category name"
+                                        })
+                                        .clicked();
+
+                                    if (add_clicked || (enter && can_add)) && can_add {
                                         let name = app.new_category_name.clone();
                                         let color = app.new_category_color.clone();
                                         if app.add_shortcut_category(&name, &color) {
                                             app.new_category_name.clear();
                                         }
+                                    }
+                                });
+
+                                ui.add_space(6.0);
+
+                                // ── Add New Category (Row 2: Palette Swatches + Suggested Button) ──
+                                ui.horizontal(|ui| {
+                                    ui.spacing_mut().item_spacing.x = 8.0;
+
+                                    ui.label(
+                                        egui::RichText::new("Color:")
+                                            .small()
+                                            .color(if app.dark_mode {
+                                                egui::Color32::from_gray(150)
+                                            } else {
+                                                egui::Color32::from_gray(90)
+                                            }),
+                                    );
+
+                                    for &(name, hex) in crate::models::PRESET_CATEGORY_COLORS {
+                                        let color = crate::models::parse_hex_color(hex)
+                                            .unwrap_or(egui::Color32::WHITE);
+                                        let is_active = app.new_category_color == hex;
+
+                                        let (rect, response) = ui.allocate_exact_size(
+                                            egui::vec2(20.0, 20.0),
+                                            egui::Sense::click(),
+                                        );
+                                        if response.clicked() {
+                                            app.new_category_color = hex.to_string();
+                                        }
+
+                                        let painter = ui.painter();
+                                        painter.circle_filled(rect.center(), 8.0, color);
+
+                                        if is_active {
+                                            painter.circle_stroke(
+                                                rect.center(),
+                                                10.0,
+                                                egui::Stroke::new(
+                                                    2.0_f32,
+                                                    if app.dark_mode {
+                                                        egui::Color32::WHITE
+                                                    } else {
+                                                        egui::Color32::BLACK
+                                                    },
+                                                ),
+                                            );
+                                        } else if response.hovered() {
+                                            painter.circle_stroke(
+                                                rect.center(),
+                                                9.5,
+                                                egui::Stroke::new(
+                                                    1.0_f32,
+                                                    if app.dark_mode {
+                                                        egui::Color32::from_gray(180)
+                                                    } else {
+                                                        egui::Color32::from_gray(80)
+                                                    },
+                                                ),
+                                            );
+                                        }
+
+                                        response.on_hover_text(format!("Select color: {}", name));
+                                    }
+
+                                    let sugg_w = 135.0;
+                                    let space = (ui.available_width() - sugg_w).max(0.0);
+                                    ui.add_space(space);
+
+                                    if ui
+                                        .add_sized(
+                                            [sugg_w, 22.0],
+                                            egui::Button::new(
+                                                egui::RichText::new(format!(
+                                                    "{} Load Suggestions",
+                                                    regular::SPARKLE
+                                                ))
+                                                .small()
+                                                .color(if app.dark_mode {
+                                                    egui::Color32::from_rgb(196, 181, 253)
+                                                } else {
+                                                    egui::Color32::from_rgb(109, 40, 217)
+                                                }),
+                                            )
+                                            .frame(false),
+                                        )
+                                        .on_hover_text("Load common preset categories (Games, Work, Utilities, Media, System)")
+                                        .clicked()
+                                    {
+                                        app.load_suggested_categories();
                                     }
                                 });
                             });
@@ -412,179 +682,276 @@ pub fn draw_shortcuts_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availab
                         }
                     }
 
-                    // Search, Monitor Filter & Category Filter Bar
-                    ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing.x = 8.0;
-                        ui.spacing_mut().interact_size.y = 28.0;
-
-                        let total_shortcuts = app.live_desktop_shortcuts.len();
-                        let filtered_count = filtered.len();
-                        let stats_text = if filtered_count == total_shortcuts {
-                            format!("{} Shortcuts", total_shortcuts)
+                    // Search, Monitor Filter & Category Filter Toolbar Card
+                    egui::Frame::group(ui.style())
+                        .inner_margin(egui::Margin::symmetric(10, 8))
+                        .corner_radius(egui::CornerRadius::same(6))
+                        .fill(if app.dark_mode {
+                            egui::Color32::from_rgb(28, 28, 28)
                         } else {
-                            format!("{}/{} Shortcuts", filtered_count, total_shortcuts)
-                        };
+                            egui::Color32::from_rgb(243, 244, 246)
+                        })
+                        .stroke(egui::Stroke::new(
+                            1.0_f32,
+                            if app.dark_mode {
+                                egui::Color32::from_rgb(46, 46, 46)
+                            } else {
+                                egui::Color32::from_rgb(222, 226, 230)
+                            },
+                        ))
+                        .show(ui, |ui| {
+                            ui.set_width(ui.available_width());
 
-                        ui.label(
-                            egui::RichText::new(stats_text)
-                                .strong()
-                                .color(if app.dark_mode {
-                                    egui::Color32::from_rgb(196, 181, 253)
+                            let total_shortcuts = app.live_desktop_shortcuts.len();
+                            let filtered_count = filtered.len();
+                            let has_query = !app.shortcut_search_query.trim().is_empty();
+                            let any_filter_active = has_query
+                                || app.shortcut_category_filter.is_some()
+                                || app.shortcut_monitor_filter.is_some()
+                                || app.shortcut_sort_mode != crate::app::ShortcutSortMode::Default;
+
+                            // ── Row 1: Search Input + Live Count Badge ──
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing.x = 8.0;
+
+                                let badge_text = if filtered_count == total_shortcuts {
+                                    format!("{} Shortcuts", total_shortcuts)
                                 } else {
-                                    egui::Color32::from_rgb(109, 40, 217)
-                                }),
-                        );
+                                    format!("{}/{} Shortcuts", filtered_count, total_shortcuts)
+                                };
 
-                        // Sort selector dropdown
-                        let current_sort_label = match app.shortcut_sort_mode {
-                            crate::app::ShortcutSortMode::Default => {
-                                format!("{} Default", regular::ARROWS_DOWN_UP)
-                            }
-                            crate::app::ShortcutSortMode::NameAsc => {
-                                format!("{} Name (A-Z)", regular::SORT_ASCENDING)
-                            }
-                            crate::app::ShortcutSortMode::NameDesc => {
-                                format!("{} Name (Z-A)", regular::SORT_DESCENDING)
-                            }
-                        };
+                                let clear_btn_w = if has_query { 24.0 } else { 0.0 };
+                                let badge_estimated_w = 110.0;
+                                let search_w = (ui.available_width() - badge_estimated_w - clear_btn_w - 16.0).max(140.0);
 
-                        let sort_combo_resp = egui::ComboBox::from_id_salt("live_shortcut_sort_mode_combo")
-                            .selected_text(current_sort_label)
-                            .width(120.0)
-                            .show_ui(ui, |ui| {
-                                ui.selectable_value(
-                                    &mut app.shortcut_sort_mode,
-                                    crate::app::ShortcutSortMode::Default,
-                                    format!("{} Default (Position)", regular::ARROWS_DOWN_UP),
+                                ui.add_sized(
+                                    [search_w, 28.0],
+                                    egui::TextEdit::singleline(&mut app.shortcut_search_query)
+                                        .hint_text(format!("{} Search shortcuts...", regular::MAGNIFYING_GLASS))
+                                        .margin(egui::Margin::symmetric(8, 5)),
                                 );
-                                ui.selectable_value(
-                                    &mut app.shortcut_sort_mode,
-                                    crate::app::ShortcutSortMode::NameAsc,
-                                    format!("{} Name (A-Z)", regular::SORT_ASCENDING),
-                                );
-                                ui.selectable_value(
-                                    &mut app.shortcut_sort_mode,
-                                    crate::app::ShortcutSortMode::NameDesc,
-                                    format!("{} Name (Z-A)", regular::SORT_DESCENDING),
-                                );
+
+                                if has_query {
+                                    if ui
+                                        .add_sized([24.0, 28.0], egui::Button::new(regular::X))
+                                        .on_hover_text("Clear search text")
+                                        .clicked()
+                                    {
+                                        app.shortcut_search_query.clear();
+                                    }
+                                }
+
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    let badge_bg = if any_filter_active {
+                                        if app.dark_mode {
+                                            egui::Color32::from_rgb(88, 28, 135)
+                                        } else {
+                                            egui::Color32::from_rgb(237, 233, 254)
+                                        }
+                                    } else {
+                                        if app.dark_mode {
+                                            egui::Color32::from_rgb(42, 42, 42)
+                                        } else {
+                                            egui::Color32::from_rgb(226, 232, 240)
+                                        }
+                                    };
+                                    let badge_fg = if any_filter_active {
+                                        if app.dark_mode {
+                                            egui::Color32::from_rgb(216, 180, 254)
+                                        } else {
+                                            egui::Color32::from_rgb(109, 40, 217)
+                                        }
+                                    } else {
+                                        if app.dark_mode {
+                                            egui::Color32::from_rgb(180, 180, 180)
+                                        } else {
+                                            egui::Color32::from_rgb(71, 85, 105)
+                                        }
+                                    };
+
+                                    egui::Frame::new()
+                                        .fill(badge_bg)
+                                        .corner_radius(egui::CornerRadius::same(12))
+                                        .inner_margin(egui::Margin::symmetric(10, 4))
+                                        .show(ui, |ui| {
+                                            ui.label(
+                                                egui::RichText::new(badge_text)
+                                                    .size(11.5)
+                                                    .strong()
+                                                    .color(badge_fg),
+                                            );
+                                        });
+                                });
                             });
-                        sort_combo_resp.response.on_hover_text("Sort shortcuts: Default desktop position, Name (A-Z), or Name (Z-A)");
 
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            ui.spacing_mut().item_spacing.x = 8.0;
-                            ui.spacing_mut().interact_size.y = 28.0;
+                            ui.add_space(6.0);
 
-                            let item_h = 28.0;
-                            let search_w = 110.0;
-                            let combo_w = 125.0;
-                            let cat_combo_w = 125.0;
+                            // ── Row 2: Category, Monitor, Sort & Reset Filters ──
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing.x = 8.0;
+                                ui.spacing_mut().interact_size.y = 26.0;
 
-                            // Text search filter on the far right
-                            ui.add_sized(
-                                [search_w, item_h],
-                                egui::TextEdit::singleline(&mut app.shortcut_search_query)
-                                    .hint_text(format!("{} Filter...", regular::MAGNIFYING_GLASS))
-                                    .desired_width(search_w)
-                                    .margin(egui::Margin::symmetric(10, 6)),
-                            );
+                                let cat_combo_w = 135.0;
+                                let mon_combo_w = 135.0;
+                                let sort_combo_w = 125.0;
 
-                            // Monitor selector dropdown
-                            let current_mon_label = match app.shortcut_monitor_filter {
-                                None => format!("{} All Monitors", regular::DESKTOP),
-                                Some(idx) => {
-                                    if let Some(m) = app.monitors.get(idx) {
-                                        let name = m
-                                            .hardware_name
-                                            .as_deref()
-                                            .unwrap_or(m.device_name.as_str());
-                                        format!("{} Mon {}: {}", regular::DESKTOP, idx + 1, name)
-                                    } else {
-                                        format!("{} Monitor {}", regular::DESKTOP, idx + 1)
-                                    }
-                                }
-                            };
-
-                            egui::ComboBox::from_id_salt("live_shortcut_monitor_filter_combo")
-                                .selected_text(current_mon_label)
-                                .width(combo_w)
-                                .show_ui(ui, |ui| {
-                                    let is_all = app.shortcut_monitor_filter.is_none();
-                                    if ui
-                                        .selectable_label(
-                                            is_all,
-                                            format!("{} All Monitors", regular::DESKTOP),
-                                        )
-                                        .clicked()
-                                    {
-                                        app.shortcut_monitor_filter = None;
-                                    }
-
-                                    for (i, m) in app.monitors.iter().enumerate() {
-                                        let is_sel = app.shortcut_monitor_filter == Some(i);
-                                        let name = m
-                                            .hardware_name
-                                            .as_deref()
-                                            .unwrap_or(m.device_name.as_str());
-                                        let label = format!("{} Mon {}: {}", regular::DESKTOP, i + 1, name);
-                                        if ui.selectable_label(is_sel, label).clicked() {
-                                            app.shortcut_monitor_filter = Some(i);
+                                // 1. Category selector dropdown
+                                let current_cat_label = match &app.shortcut_category_filter {
+                                    None => format!("{} All Categories", regular::TAG),
+                                    Some(id) => {
+                                        if id == "uncategorized" {
+                                            format!("{} Untagged", regular::TAG)
+                                        } else if let Some(cat) = categories.iter().find(|c| &c.id == id) {
+                                            if cat.name.len() > 11 {
+                                                format!("● {}…", &cat.name[..10])
+                                            } else {
+                                                format!("● {}", cat.name)
+                                            }
+                                        } else {
+                                            format!("{} Category", regular::TAG)
                                         }
                                     }
-                                });
+                                };
 
-                            // Category selector dropdown
-                            let current_cat_label = match &app.shortcut_category_filter {
-                                None => format!("{} All Categories", regular::TAG),
-                                Some(id) => {
-                                    if id == "uncategorized" {
-                                        format!("{} Untagged", regular::TAG)
-                                    } else if let Some(cat) = categories.iter().find(|c| &c.id == id) {
-                                        format!("● {}", cat.name)
-                                    } else {
-                                        format!("{} Category", regular::TAG)
+                                egui::ComboBox::from_id_salt("live_shortcut_category_filter_combo")
+                                    .selected_text(current_cat_label)
+                                    .width(cat_combo_w)
+                                    .show_ui(ui, |ui| {
+                                        let is_all = app.shortcut_category_filter.is_none();
+                                        if ui
+                                            .selectable_label(is_all, format!("{} All Categories", regular::TAG))
+                                            .clicked()
+                                        {
+                                            app.shortcut_category_filter = None;
+                                        }
+
+                                        for cat in &categories {
+                                            let is_sel = app.shortcut_category_filter.as_ref() == Some(&cat.id);
+                                            let label = egui::RichText::new(format!("● {}", cat.name)).color(cat.color32());
+                                            if ui.selectable_label(is_sel, label).clicked() {
+                                                app.shortcut_category_filter = Some(cat.id.clone());
+                                            }
+                                        }
+
+                                        if ui
+                                            .selectable_label(
+                                                app.shortcut_category_filter.as_deref() == Some("uncategorized"),
+                                                format!("{} Untagged", regular::TAG),
+                                            )
+                                            .clicked()
+                                        {
+                                            app.shortcut_category_filter = Some("uncategorized".to_string());
+                                        }
+                                    });
+
+                                // 2. Monitor selector dropdown
+                                let current_mon_label = match app.shortcut_monitor_filter {
+                                    None => format!("{} All Monitors", regular::DESKTOP),
+                                    Some(idx) => {
+                                        if let Some(m) = app.monitors.get(idx) {
+                                            let name = m
+                                                .hardware_name
+                                                .as_deref()
+                                                .unwrap_or(m.device_name.as_str());
+                                            if name.len() > 10 {
+                                                format!("{} M{}: {}…", regular::DESKTOP, idx + 1, &name[..9])
+                                            } else {
+                                                format!("{} M{}: {}", regular::DESKTOP, idx + 1, name)
+                                            }
+                                        } else {
+                                            format!("{} Monitor {}", regular::DESKTOP, idx + 1)
+                                        }
                                     }
-                                }
-                            };
+                                };
 
-                            egui::ComboBox::from_id_salt("live_shortcut_category_filter_combo")
-                                .selected_text(current_cat_label)
-                                .width(cat_combo_w)
-                                .show_ui(ui, |ui| {
-                                    let is_all = app.shortcut_category_filter.is_none();
+                                egui::ComboBox::from_id_salt("live_shortcut_monitor_filter_combo")
+                                    .selected_text(current_mon_label)
+                                    .width(mon_combo_w)
+                                    .show_ui(ui, |ui| {
+                                        let is_all = app.shortcut_monitor_filter.is_none();
+                                        if ui
+                                            .selectable_label(is_all, format!("{} All Monitors", regular::DESKTOP))
+                                            .clicked()
+                                        {
+                                            app.shortcut_monitor_filter = None;
+                                        }
+
+                                        for (i, m) in app.monitors.iter().enumerate() {
+                                            let is_sel = app.shortcut_monitor_filter == Some(i);
+                                            let name = m
+                                                .hardware_name
+                                                .as_deref()
+                                                .unwrap_or(m.device_name.as_str());
+                                            let label = format!("{} Mon {}: {}", regular::DESKTOP, i + 1, name);
+                                            if ui.selectable_label(is_sel, label).clicked() {
+                                                app.shortcut_monitor_filter = Some(i);
+                                            }
+                                        }
+                                    });
+
+                                // 3. Sort selector dropdown
+                                let current_sort_label = match app.shortcut_sort_mode {
+                                    crate::app::ShortcutSortMode::Default => {
+                                        format!("{} Default", regular::ARROWS_DOWN_UP)
+                                    }
+                                    crate::app::ShortcutSortMode::NameAsc => {
+                                        format!("{} Name (A-Z)", regular::SORT_ASCENDING)
+                                    }
+                                    crate::app::ShortcutSortMode::NameDesc => {
+                                        format!("{} Name (Z-A)", regular::SORT_DESCENDING)
+                                    }
+                                };
+
+                                egui::ComboBox::from_id_salt("live_shortcut_sort_mode_combo")
+                                    .selected_text(current_sort_label)
+                                    .width(sort_combo_w)
+                                    .show_ui(ui, |ui| {
+                                        ui.selectable_value(
+                                            &mut app.shortcut_sort_mode,
+                                            crate::app::ShortcutSortMode::Default,
+                                            format!("{} Default (Position)", regular::ARROWS_DOWN_UP),
+                                        );
+                                        ui.selectable_value(
+                                            &mut app.shortcut_sort_mode,
+                                            crate::app::ShortcutSortMode::NameAsc,
+                                            format!("{} Name (A-Z)", regular::SORT_ASCENDING),
+                                        );
+                                        ui.selectable_value(
+                                            &mut app.shortcut_sort_mode,
+                                            crate::app::ShortcutSortMode::NameDesc,
+                                            format!("{} Name (Z-A)", regular::SORT_DESCENDING),
+                                        );
+                                    });
+
+                                // 4. Reset Filters Button (appears when any filter is active)
+                                if any_filter_active {
+                                    let reset_btn = egui::Button::new(
+                                        egui::RichText::new(format!("{} Reset", regular::X))
+                                            .small()
+                                            .color(if app.dark_mode {
+                                                egui::Color32::from_rgb(248, 113, 113)
+                                            } else {
+                                                egui::Color32::from_rgb(220, 38, 38)
+                                            }),
+                                    );
                                     if ui
-                                        .selectable_label(
-                                            is_all,
-                                            format!("{} All Categories", regular::TAG),
-                                        )
+                                        .add(reset_btn)
+                                        .on_hover_text("Reset search query, category filter, monitor filter, and sort order")
                                         .clicked()
                                     {
+                                        app.shortcut_search_query.clear();
                                         app.shortcut_category_filter = None;
+                                        app.shortcut_monitor_filter = None;
+                                        app.shortcut_sort_mode = crate::app::ShortcutSortMode::Default;
                                     }
-
-                                    for cat in &categories {
-                                        let is_sel = app.shortcut_category_filter.as_ref() == Some(&cat.id);
-                                        let label = egui::RichText::new(format!("● {}", cat.name)).color(cat.color32());
-                                        if ui.selectable_label(is_sel, label).clicked() {
-                                            app.shortcut_category_filter = Some(cat.id.clone());
-                                        }
-                                    }
-
-                                    if ui
-                                        .selectable_label(
-                                            app.shortcut_category_filter.as_deref() == Some("uncategorized"),
-                                            format!("{} Untagged", regular::TAG),
-                                        )
-                                        .clicked()
-                                    {
-                                        app.shortcut_category_filter = Some("uncategorized".to_string());
-                                    }
-                                });
+                                }
+                            });
                         });
-                    });
 
                     ui.add_space(8.0);
 
                     let mut to_update_category: Option<(String, Option<String>)> = None;
+                    let mut clear_all_filters = false;
 
                     egui::ScrollArea::vertical()
                         .id_salt("live_shortcuts_list_scroll")
@@ -602,6 +969,12 @@ pub fn draw_shortcuts_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availab
                                         })
                                         .color(egui::Color32::GRAY),
                                     );
+                                    if !app.live_desktop_shortcuts.is_empty() {
+                                        ui.add_space(8.0);
+                                        if ui.button(format!("{} Clear Filters", regular::X)).clicked() {
+                                            clear_all_filters = true;
+                                        }
+                                    }
                                 });
                             } else {
                                 for (idx, icon) in filtered.iter().enumerate() {
@@ -715,6 +1088,13 @@ pub fn draw_shortcuts_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availab
 
                     if let Some((name, cat_id)) = to_update_category {
                         app.set_shortcut_category(&name, cat_id);
+                    }
+
+                    if clear_all_filters {
+                        app.shortcut_search_query.clear();
+                        app.shortcut_category_filter = None;
+                        app.shortcut_monitor_filter = None;
+                        app.shortcut_sort_mode = crate::app::ShortcutSortMode::Default;
                     }
                 });
         });
