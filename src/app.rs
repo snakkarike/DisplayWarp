@@ -90,9 +90,9 @@ pub struct WindowManagerApp {
     // ── Shared ──
     pub status_message: Arc<parking_lot::Mutex<String>>,
     pub status_log: Arc<parking_lot::Mutex<Vec<String>>>,
-    pub markdown_cache: egui_commonmark::CommonMarkCache,
     // ── Theme ──
     pub dark_mode: bool,
+    pub theme: crate::ui::theme::Theme,
     // ── Startup State ──
     pub first_frame_hidden: bool,
 }
@@ -150,8 +150,8 @@ impl Default for WindowManagerApp {
             edit_profile_audio_device_idx: 0,
             status_message: Arc::new(parking_lot::Mutex::new(String::from("Ready."))),
             status_log: Arc::new(parking_lot::Mutex::new(vec!["Ready.".to_string()])),
-            markdown_cache: egui_commonmark::CommonMarkCache::default(),
             dark_mode: true,
+            theme: crate::ui::theme::Theme::new(true),
             first_frame_hidden: false,
         };
         app.refresh_monitors();

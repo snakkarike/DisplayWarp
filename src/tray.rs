@@ -136,7 +136,7 @@ mod uxtheme {
 }
 
 /// Apply dark/light mode to the app window title bar and context menus.
-fn apply_window_dark_mode(dark: bool) {
+pub fn apply_window_dark_mode(dark: bool) {
     unsafe {
         use windows::Win32::Graphics::Dwm::{DWMWA_USE_IMMERSIVE_DARK_MODE, DwmSetWindowAttribute};
         use windows::Win32::UI::WindowsAndMessaging::FindWindowW;

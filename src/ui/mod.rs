@@ -1,27 +1,30 @@
 pub mod display_tab;
 pub mod helpers;
+pub mod icons;
 pub mod log_tab;
 pub mod monitor_preview;
 pub mod settings_tab;
 pub mod shortcuts_tab;
+pub mod theme;
 pub mod warp_tab;
 
 use eframe::egui;
-use egui_phosphor::regular;
+use self::icons::regular;
 
 use crate::app::{AppTab, WindowManagerApp};
 
 // ─── eframe App impl ─────────────────────────────────────────────────────────
 
 impl eframe::App for WindowManagerApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
         ctx.request_repaint_after(std::time::Duration::from_millis(500));
 
         // ── First Frame Hidden Override ────────────────────────────────────
         if !self.first_frame_hidden {
             self.first_frame_hidden = true;
             if self.data.lock().start_minimized {
-                hide_native_window(ctx);
+                hide_native_window(&ctx);
             }
         }
 
@@ -31,7 +34,7 @@ impl eframe::App for WindowManagerApp {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
 
             if self.data.lock().close_to_tray {
-                hide_native_window(ctx);
+                hide_native_window(&ctx);
             } else {
                 self.watcher_running
                     .store(false, std::sync::atomic::Ordering::Relaxed);
@@ -39,46 +42,14 @@ impl eframe::App for WindowManagerApp {
             }
         }
 
-        // ── Apply theme styling ─────────────────────────────────────
-        let mut style = (*ctx.style()).clone();
-        style.spacing.item_spacing = egui::vec2(8.0, 6.0);
-        style.spacing.button_padding = egui::vec2(10.0, 5.0);
-        style.spacing.combo_height = 300.0;
-        style.visuals.widgets.noninteractive.corner_radius = egui::CornerRadius::same(6);
-        style.visuals.widgets.inactive.corner_radius = egui::CornerRadius::same(6);
-        style.visuals.widgets.hovered.corner_radius = egui::CornerRadius::same(6);
-        style.visuals.widgets.active.corner_radius = egui::CornerRadius::same(6);
-
-        if self.dark_mode {
-            style.visuals = egui::Visuals::dark();
-            style.visuals.window_fill = egui::Color32::from_rgb(14, 14, 14);
-            style.visuals.panel_fill = egui::Color32::from_rgb(14, 14, 14);
-            style.visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(7, 7, 7);
-        } else {
-            style.visuals = egui::Visuals::light();
-            style.visuals.window_fill = egui::Color32::WHITE;
-            style.visuals.panel_fill = egui::Color32::WHITE;
-
-            // Text: Black
-            style.visuals.override_text_color = Some(egui::Color32::BLACK);
-            style.visuals.widgets.noninteractive.fg_stroke.color = egui::Color32::BLACK;
-            style.visuals.widgets.inactive.fg_stroke.color = egui::Color32::BLACK;
-            style.visuals.widgets.hovered.fg_stroke.color = egui::Color32::BLACK;
-            style.visuals.widgets.active.fg_stroke.color = egui::Color32::BLACK;
-
-            // Button bg: CBD5E1
-            let btn_bg = egui::Color32::from_rgb(203, 213, 225);
-            style.visuals.widgets.inactive.bg_fill = btn_bg;
-            style.visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(180, 195, 215); // Slightly darker for hover
-            style.visuals.widgets.active.bg_fill = egui::Color32::from_rgb(160, 175, 195);
-        }
-
-        ctx.set_style(style);
+        // ── Apply theme styling ────────────────────────────────────────────
+        self.theme = theme::Theme::new(self.dark_mode);
+        self.theme.apply_to_ui(ui);
 
         // ── Bottom Bar: Version + Theme Toggle ─────────────────────────────
-        egui::TopBottomPanel::bottom("bottom_bar")
+        egui::Panel::bottom("bottom_bar")
             .resizable(false)
-            .show(ctx, |ui| {
+            .show(ui, |ui| {
                 egui::Frame::NONE
                     .inner_margin(egui::Margin::same(8))
                     .show(ui, |ui| {
@@ -110,6 +81,9 @@ impl eframe::App for WindowManagerApp {
                                             };
                                             if ui.button(theme_icon).clicked() {
                                                 self.dark_mode = !self.dark_mode;
+                                                self.theme = theme::Theme::new(self.dark_mode);
+                                                self.theme.apply_to_ui(ui);
+                                                crate::tray::apply_window_dark_mode(self.dark_mode);
                                             }
                                         },
                                     );
@@ -120,8 +94,7 @@ impl eframe::App for WindowManagerApp {
             });
 
         // ── Central: everything else ─────────────────────────────────────
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.add_space(2.0);
+        ui.add_space(2.0);
 
             // Tab Bar with Logo
             ui.horizontal(|ui| {
@@ -238,7 +211,6 @@ impl eframe::App for WindowManagerApp {
                         });
                 }
             }
-        });
     }
 }
 

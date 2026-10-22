@@ -1,5 +1,5 @@
 use eframe::egui;
-use egui_phosphor::regular;
+use crate::ui::icons::regular;
 
 use crate::app::WindowManagerApp;
 

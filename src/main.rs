@@ -72,7 +72,15 @@ fn main() -> eframe::Result {
                 .insert(0, "geist".into());
 
             // Phosphor icons as fallback.
-            egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+            fonts.font_data.insert(
+                "phosphor".into(),
+                egui::FontData::from_static(include_bytes!("../assets/fonts/Phosphor.ttf")).into(),
+            );
+            fonts
+                .families
+                .entry(egui::FontFamily::Proportional)
+                .or_default()
+                .push("phosphor".into());
 
             cc.egui_ctx.set_fonts(fonts);
 
@@ -112,6 +120,8 @@ fn main() -> eframe::Result {
                 app.status_log.clone(),
             );
             app.tray = Some(tray_items);
+            app.theme.apply_to_ctx(&cc.egui_ctx);
+            tray::apply_window_dark_mode(app.dark_mode);
             Ok(Box::new(app))
         }),
     )

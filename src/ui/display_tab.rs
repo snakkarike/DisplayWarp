@@ -1,5 +1,5 @@
 use eframe::egui;
-use egui_phosphor::regular;
+use crate::ui::icons::regular;
 
 use crate::app::WindowManagerApp;
 use crate::ui::helpers::truncate_text;
@@ -334,7 +334,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
 
                         // Interaction
                         let response =
-                            ui.interact(m_rect, ui.id().with(first_idx), egui::Sense::click());
+                            ui.interact(m_rect, ui.scope_id().with(first_idx), egui::Sense::click());
                         if response.clicked() {
                             app.selected_display_idx = Some(first_idx);
                         }

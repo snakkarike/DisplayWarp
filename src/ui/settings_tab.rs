@@ -1,5 +1,5 @@
 use eframe::egui;
-use egui_phosphor::regular;
+use crate::ui::icons::regular;
 
 use crate::app::WindowManagerApp;
 
@@ -152,6 +152,9 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                                         let theme_icon = if app.dark_mode { regular::SUN } else { regular::MOON };
                                         if ui.button(format!("{} Toggle Theme", theme_icon)).clicked() {
                                             app.dark_mode = !app.dark_mode;
+                                            app.theme = crate::ui::theme::Theme::new(app.dark_mode);
+                                            app.theme.apply_to_ui(ui);
+                                            crate::tray::apply_window_dark_mode(app.dark_mode);
                                         }
                                     });
                                 });
@@ -427,11 +430,21 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                         .id_salt("changelog_scroll")
                         .auto_shrink([false; 2])
                         .show(ui, |ui| {
-                            egui_commonmark::CommonMarkViewer::new().show(
-                                ui,
-                                &mut app.markdown_cache,
-                                include_str!("../../CHANGELOG.md"),
-                            );
+                            for line in include_str!("../../CHANGELOG.md").lines() {
+                                if line.starts_with("# ") {
+                                    ui.heading(&line[2..]);
+                                } else if line.starts_with("## ") {
+                                    ui.label(egui::RichText::new(&line[3..]).strong().size(14.0));
+                                } else if line.starts_with("### ") {
+                                    ui.label(egui::RichText::new(&line[4..]).strong());
+                                } else if line.starts_with("- ") {
+                                    ui.label(format!("  • {}", &line[2..]));
+                                } else if line.trim().is_empty() {
+                                    ui.add_space(4.0);
+                                } else {
+                                    ui.label(line);
+                                }
+                            }
                         });
                 });
         });
