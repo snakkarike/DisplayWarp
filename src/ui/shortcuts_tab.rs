@@ -668,6 +668,7 @@ pub fn draw_shortcuts_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availab
                     // Filtered list of shortcuts
                     let query = app.shortcut_search_query.trim().to_lowercase();
                     let categories = app.data.lock().shortcut_categories.clone();
+                    let assignments = app.data.lock().shortcut_category_assignments.clone();
 
                     let mut filtered: Vec<_> = app
                         .live_desktop_shortcuts
@@ -702,6 +703,14 @@ pub fn draw_shortcuts_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availab
                         })
                         .collect();
 
+                    let get_cat_name = |icon: &crate::desktop_icons::DesktopIconPos| -> Option<String> {
+                        let cat_id = icon
+                            .category_id
+                            .as_deref()
+                            .or_else(|| assignments.get(&icon.name).map(|s| s.as_str()))?;
+                        categories.iter().find(|c| c.id == cat_id).map(|c| c.name.to_lowercase())
+                    };
+
                     match app.shortcut_sort_mode {
                         crate::app::ShortcutSortMode::Default => {}
                         crate::app::ShortcutSortMode::NameAsc => {
@@ -709,6 +718,44 @@ pub fn draw_shortcuts_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availab
                         }
                         crate::app::ShortcutSortMode::NameDesc => {
                             filtered.sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()));
+                        }
+                        crate::app::ShortcutSortMode::CategoryAsc => {
+                            filtered.sort_by(|a, b| {
+                                let cat_a = get_cat_name(a);
+                                let cat_b = get_cat_name(b);
+                                match (&cat_a, &cat_b) {
+                                    (Some(ca), Some(cb)) => {
+                                        let cmp = ca.cmp(cb);
+                                        if cmp == std::cmp::Ordering::Equal {
+                                            a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                                        } else {
+                                            cmp
+                                        }
+                                    }
+                                    (Some(_), None) => std::cmp::Ordering::Less,
+                                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                                    (None, None) => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                                }
+                            });
+                        }
+                        crate::app::ShortcutSortMode::CategoryDesc => {
+                            filtered.sort_by(|a, b| {
+                                let cat_a = get_cat_name(a);
+                                let cat_b = get_cat_name(b);
+                                match (&cat_a, &cat_b) {
+                                    (Some(ca), Some(cb)) => {
+                                        let cmp = cb.cmp(ca);
+                                        if cmp == std::cmp::Ordering::Equal {
+                                            a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                                        } else {
+                                            cmp
+                                        }
+                                    }
+                                    (Some(_), None) => std::cmp::Ordering::Less,
+                                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                                    (None, None) => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                                }
+                            });
                         }
                     }
 
@@ -821,9 +868,9 @@ pub fn draw_shortcuts_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availab
                                 ui.spacing_mut().item_spacing.x = 8.0;
                                 ui.spacing_mut().interact_size.y = 26.0;
 
-                                let cat_combo_w = 135.0;
-                                let mon_combo_w = 135.0;
-                                let sort_combo_w = 125.0;
+                                let cat_combo_w = 130.0;
+                                let mon_combo_w = 130.0;
+                                let sort_combo_w = 138.0;
 
                                 // 1. Category selector dropdown
                                 let current_cat_label = match &app.shortcut_category_filter {
@@ -930,6 +977,12 @@ pub fn draw_shortcuts_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availab
                                     crate::app::ShortcutSortMode::NameDesc => {
                                         format!("{} Name (Z-A)", regular::SORT_DESCENDING)
                                     }
+                                    crate::app::ShortcutSortMode::CategoryAsc => {
+                                        format!("{} Category (A-Z)", regular::TAG)
+                                    }
+                                    crate::app::ShortcutSortMode::CategoryDesc => {
+                                        format!("{} Category (Z-A)", regular::TAG)
+                                    }
                                 };
 
                                 egui::ComboBox::from_id_salt("live_shortcut_sort_mode_combo")
@@ -950,6 +1003,16 @@ pub fn draw_shortcuts_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availab
                                             &mut app.shortcut_sort_mode,
                                             crate::app::ShortcutSortMode::NameDesc,
                                             format!("{} Name (Z-A)", regular::SORT_DESCENDING),
+                                        );
+                                        ui.selectable_value(
+                                            &mut app.shortcut_sort_mode,
+                                            crate::app::ShortcutSortMode::CategoryAsc,
+                                            format!("{} Category (A-Z)", regular::TAG),
+                                        );
+                                        ui.selectable_value(
+                                            &mut app.shortcut_sort_mode,
+                                            crate::app::ShortcutSortMode::CategoryDesc,
+                                            format!("{} Category (Z-A)", regular::TAG),
                                         );
                                     });
 
@@ -1007,6 +1070,10 @@ pub fn draw_shortcuts_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availab
                                     }
                                 });
                             } else {
+                                let is_category_sort = app.shortcut_sort_mode == crate::app::ShortcutSortMode::CategoryAsc
+                                    || app.shortcut_sort_mode == crate::app::ShortcutSortMode::CategoryDesc;
+                                let mut last_category_id: Option<Option<String>> = None;
+
                                 for (idx, icon) in filtered.iter().enumerate() {
                                     // Determine which monitor this icon is on
                                     let mon_label = app
@@ -1026,6 +1093,143 @@ pub fn draw_shortcuts_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availab
                                         .unwrap_or("Desktop");
 
                                     let current_cat = app.get_shortcut_category(&icon.name);
+
+                                    if is_category_sort {
+                                        let cur_cat_id = current_cat.as_ref().map(|c| c.id.clone());
+                                        if last_category_id.as_ref() != Some(&cur_cat_id) {
+                                            last_category_id = Some(cur_cat_id.clone());
+
+                                            if let Some(cat) = &current_cat {
+                                                let group_count = filtered
+                                                    .iter()
+                                                    .filter(|i| {
+                                                        let cid = i
+                                                            .category_id
+                                                            .as_deref()
+                                                            .or_else(|| assignments.get(&i.name).map(|s| s.as_str()));
+                                                        cid == Some(&cat.id)
+                                                    })
+                                                    .count();
+
+                                                if idx > 0 {
+                                                    ui.add_space(8.0);
+                                                }
+                                                ui.horizontal(|ui| {
+                                                    ui.spacing_mut().item_spacing.x = 6.0;
+                                                    ui.label(egui::RichText::new("●").size(11.0).color(cat.color32()));
+                                                    ui.label(
+                                                        egui::RichText::new(&cat.name)
+                                                            .strong()
+                                                            .size(12.5)
+                                                            .color(if app.dark_mode {
+                                                                egui::Color32::WHITE
+                                                            } else {
+                                                                egui::Color32::from_rgb(15, 23, 42)
+                                                            }),
+                                                    );
+
+                                                    let count_bg = if app.dark_mode {
+                                                        egui::Color32::from_rgb(40, 40, 40)
+                                                    } else {
+                                                        egui::Color32::from_rgb(226, 232, 240)
+                                                    };
+                                                    egui::Frame::new()
+                                                        .fill(count_bg)
+                                                        .corner_radius(egui::CornerRadius::same(8))
+                                                        .inner_margin(egui::Margin::symmetric(6, 1))
+                                                        .show(ui, |ui| {
+                                                            ui.label(
+                                                                egui::RichText::new(format!("{}", group_count))
+                                                                    .size(10.0)
+                                                                    .color(if app.dark_mode {
+                                                                        egui::Color32::from_gray(180)
+                                                                    } else {
+                                                                        egui::Color32::from_gray(70)
+                                                                    }),
+                                                            );
+                                                        });
+
+                                                    let line_color = if app.dark_mode {
+                                                        egui::Color32::from_rgb(45, 45, 45)
+                                                    } else {
+                                                        egui::Color32::from_rgb(220, 225, 230)
+                                                    };
+                                                    let avail_w = ui.available_width();
+                                                    if avail_w > 10.0 {
+                                                        let (rect, _) = ui.allocate_exact_size(egui::vec2(avail_w, 1.0), egui::Sense::hover());
+                                                        ui.painter().hline(rect.x_range(), rect.center().y, egui::Stroke::new(1.0, line_color));
+                                                    }
+                                                });
+                                                ui.add_space(4.0);
+                                            } else {
+                                                let group_count = filtered
+                                                    .iter()
+                                                    .filter(|i| {
+                                                        let cid = i
+                                                            .category_id
+                                                            .as_deref()
+                                                            .or_else(|| assignments.get(&i.name).map(|s| s.as_str()));
+                                                        cid.is_none()
+                                                    })
+                                                    .count();
+
+                                                if idx > 0 {
+                                                    ui.add_space(8.0);
+                                                }
+                                                ui.horizontal(|ui| {
+                                                    ui.spacing_mut().item_spacing.x = 6.0;
+                                                    ui.label(
+                                                        egui::RichText::new(regular::TAG)
+                                                            .size(11.0)
+                                                            .color(egui::Color32::GRAY),
+                                                    );
+                                                    ui.label(
+                                                        egui::RichText::new("Untagged")
+                                                            .strong()
+                                                            .size(12.5)
+                                                            .color(if app.dark_mode {
+                                                                egui::Color32::from_gray(180)
+                                                            } else {
+                                                                egui::Color32::from_gray(90)
+                                                            }),
+                                                    );
+
+                                                    let count_bg = if app.dark_mode {
+                                                        egui::Color32::from_rgb(40, 40, 40)
+                                                    } else {
+                                                        egui::Color32::from_rgb(226, 232, 240)
+                                                    };
+                                                    egui::Frame::new()
+                                                        .fill(count_bg)
+                                                        .corner_radius(egui::CornerRadius::same(8))
+                                                        .inner_margin(egui::Margin::symmetric(6, 1))
+                                                        .show(ui, |ui| {
+                                                            ui.label(
+                                                                egui::RichText::new(format!("{}", group_count))
+                                                                    .size(10.0)
+                                                                    .color(if app.dark_mode {
+                                                                        egui::Color32::from_gray(180)
+                                                                    } else {
+                                                                        egui::Color32::from_gray(70)
+                                                                    }),
+                                                            );
+                                                        });
+
+                                                    let line_color = if app.dark_mode {
+                                                        egui::Color32::from_rgb(45, 45, 45)
+                                                    } else {
+                                                        egui::Color32::from_rgb(220, 225, 230)
+                                                    };
+                                                    let avail_w = ui.available_width();
+                                                    if avail_w > 10.0 {
+                                                        let (rect, _) = ui.allocate_exact_size(egui::vec2(avail_w, 1.0), egui::Sense::hover());
+                                                        ui.painter().hline(rect.x_range(), rect.center().y, egui::Stroke::new(1.0, line_color));
+                                                    }
+                                                });
+                                                ui.add_space(4.0);
+                                            }
+                                        }
+                                    }
 
                                     let is_even = idx % 2 == 0;
                                     let row_bg = if app.dark_mode {
@@ -1367,6 +1571,14 @@ pub fn draw_shortcuts_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availab
                                                     })
                                                     .collect();
 
+                                                let get_layout_cat_name = |item: &crate::desktop_icons::DesktopIconPos| -> Option<String> {
+                                                    let cat_id = item
+                                                        .category_id
+                                                        .as_deref()
+                                                        .or_else(|| assignments.get(&item.name).map(|s| s.as_str()))?;
+                                                    categories.iter().find(|c| c.id == cat_id).map(|c| c.name.to_lowercase())
+                                                };
+
                                                 match app.shortcut_sort_mode {
                                                     crate::app::ShortcutSortMode::Default => {}
                                                     crate::app::ShortcutSortMode::NameAsc => {
@@ -1374,6 +1586,44 @@ pub fn draw_shortcuts_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availab
                                                     }
                                                     crate::app::ShortcutSortMode::NameDesc => {
                                                         layout_filtered.sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()));
+                                                    }
+                                                    crate::app::ShortcutSortMode::CategoryAsc => {
+                                                        layout_filtered.sort_by(|a, b| {
+                                                            let cat_a = get_layout_cat_name(a);
+                                                            let cat_b = get_layout_cat_name(b);
+                                                            match (&cat_a, &cat_b) {
+                                                                (Some(ca), Some(cb)) => {
+                                                                    let cmp = ca.cmp(cb);
+                                                                    if cmp == std::cmp::Ordering::Equal {
+                                                                        a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                                                                    } else {
+                                                                        cmp
+                                                                    }
+                                                                }
+                                                                (Some(_), None) => std::cmp::Ordering::Less,
+                                                                (None, Some(_)) => std::cmp::Ordering::Greater,
+                                                                (None, None) => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                                                            }
+                                                        });
+                                                    }
+                                                    crate::app::ShortcutSortMode::CategoryDesc => {
+                                                        layout_filtered.sort_by(|a, b| {
+                                                            let cat_a = get_layout_cat_name(a);
+                                                            let cat_b = get_layout_cat_name(b);
+                                                            match (&cat_a, &cat_b) {
+                                                                (Some(ca), Some(cb)) => {
+                                                                    let cmp = cb.cmp(ca);
+                                                                    if cmp == std::cmp::Ordering::Equal {
+                                                                        a.name.to_lowercase().cmp(&b.name.to_lowercase())
+                                                                    } else {
+                                                                        cmp
+                                                                    }
+                                                                }
+                                                                (Some(_), None) => std::cmp::Ordering::Less,
+                                                                (None, Some(_)) => std::cmp::Ordering::Greater,
+                                                                (None, None) => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                                                            }
+                                                        });
                                                     }
                                                 }
 

@@ -29,6 +29,8 @@ pub enum ShortcutSortMode {
     Default,
     NameAsc,
     NameDesc,
+    CategoryAsc,
+    CategoryDesc,
 }
 
 pub struct WindowManagerApp {
