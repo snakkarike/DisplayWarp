@@ -210,142 +210,172 @@ pub fn draw_shortcuts_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availab
                                         }
                                     });
                                 } else {
-                                    ui.horizontal_wrapped(|ui| {
-                                        ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
-                                        let mut cat_to_delete: Option<String> = None;
-                                        let mut cat_to_filter: Option<String> = None;
+                                    let available_w = ui.available_width();
+                                    let spacing = 8.0;
 
-                                        for cat in &categories {
-                                            let count = assignments.values().filter(|v| *v == &cat.id).count();
-                                            let color = cat.color32();
-                                            let is_active_filter = app.shortcut_category_filter.as_deref() == Some(&cat.id);
+                                    // Partition pills into rows so they wrap cleanly without exceeding container width
+                                    let mut pill_rows: Vec<Vec<&crate::models::ShortcutCategory>> = Vec::new();
+                                    let mut current_row: Vec<&crate::models::ShortcutCategory> = Vec::new();
+                                    let mut current_row_w = 0.0;
 
-                                            let bg_color = if is_active_filter {
-                                                if app.dark_mode {
-                                                    color.linear_multiply(0.35)
+                                    for cat in &categories {
+                                        let count = assignments.values().filter(|v| *v == &cat.id).count();
+                                        let count_extra = if count >= 100 { 14.0 } else if count >= 10 { 7.0 } else { 0.0 };
+                                        let pill_w = 74.0 + count_extra + (cat.name.len() as f32 * 6.4);
+                                        if !current_row.is_empty() && (current_row_w + spacing + pill_w > available_w) {
+                                            pill_rows.push(std::mem::take(&mut current_row));
+                                            current_row_w = 0.0;
+                                        }
+                                        if !current_row.is_empty() {
+                                            current_row_w += spacing;
+                                        }
+                                        current_row_w += pill_w;
+                                        current_row.push(cat);
+                                    }
+                                    if !current_row.is_empty() {
+                                        pill_rows.push(current_row);
+                                    }
+
+                                    let mut cat_to_delete: Option<String> = None;
+                                    let mut cat_to_filter: Option<String> = None;
+
+                                    for row in pill_rows {
+                                        ui.horizontal(|ui| {
+                                            ui.spacing_mut().item_spacing.x = 8.0;
+
+                                            for cat in row {
+                                                let count = assignments.values().filter(|v| *v == &cat.id).count();
+                                                let color = cat.color32();
+                                                let is_active_filter = app.shortcut_category_filter.as_deref() == Some(&cat.id);
+
+                                                let bg_color = if is_active_filter {
+                                                    if app.dark_mode {
+                                                        color.linear_multiply(0.35)
+                                                    } else {
+                                                        color.linear_multiply(0.25)
+                                                    }
                                                 } else {
-                                                    color.linear_multiply(0.25)
-                                                }
-                                            } else {
-                                                if app.dark_mode {
-                                                    color.linear_multiply(0.15)
+                                                    if app.dark_mode {
+                                                        color.linear_multiply(0.15)
+                                                    } else {
+                                                        color.linear_multiply(0.10)
+                                                    }
+                                                };
+
+                                                let border_color = if is_active_filter {
+                                                    color
                                                 } else {
-                                                    color.linear_multiply(0.10)
-                                                }
-                                            };
+                                                    if app.dark_mode {
+                                                        color.linear_multiply(0.50)
+                                                    } else {
+                                                        color.linear_multiply(0.40)
+                                                    }
+                                                };
 
-                                            let border_color = if is_active_filter {
-                                                color
-                                            } else {
-                                                if app.dark_mode {
-                                                    color.linear_multiply(0.50)
-                                                } else {
-                                                    color.linear_multiply(0.40)
-                                                }
-                                            };
+                                                let stroke_w = if is_active_filter { 1.5_f32 } else { 1.0_f32 };
 
-                                            let stroke_w = if is_active_filter { 1.5_f32 } else { 1.0_f32 };
+                                                egui::Frame::new()
+                                                    .fill(bg_color)
+                                                    .stroke(egui::Stroke::new(stroke_w, border_color))
+                                                    .corner_radius(egui::CornerRadius::same(14))
+                                                    .inner_margin(egui::Margin::symmetric(10, 4))
+                                                    .show(ui, |ui| {
+                                                        ui.horizontal(|ui| {
+                                                            ui.spacing_mut().item_spacing.x = 6.0;
 
-                                            egui::Frame::new()
-                                                .fill(bg_color)
-                                                .stroke(egui::Stroke::new(stroke_w, border_color))
-                                                .corner_radius(egui::CornerRadius::same(14))
-                                                .inner_margin(egui::Margin::symmetric(10, 4))
-                                                .show(ui, |ui| {
-                                                    ui.horizontal(|ui| {
-                                                        ui.spacing_mut().item_spacing.x = 6.0;
+                                                            // Color Dot
+                                                            ui.label(egui::RichText::new("●").size(12.0).color(color));
 
-                                                        // Color Dot
-                                                        ui.label(egui::RichText::new("●").size(12.0).color(color));
-
-                                                        // Category Name (Click to toggle filter)
-                                                        let name_resp = ui.add(
-                                                            egui::Label::new(
-                                                                egui::RichText::new(&cat.name)
-                                                                    .strong()
-                                                                    .small()
-                                                                    .color(if app.dark_mode {
-                                                                        egui::Color32::WHITE
-                                                                    } else {
-                                                                        egui::Color32::BLACK
-                                                                    }),
-                                                            )
-                                                            .sense(egui::Sense::click()),
-                                                        )
-                                                        .on_hover_text(if is_active_filter {
-                                                            "Active filter — click to clear filter"
-                                                        } else {
-                                                            "Click to filter shortcuts by this category"
-                                                        });
-
-                                                        if name_resp.clicked() {
-                                                            if is_active_filter {
-                                                                cat_to_filter = Some("clear".to_string());
-                                                            } else {
-                                                                cat_to_filter = Some(cat.id.clone());
-                                                            }
-                                                        }
-
-                                                        // Counter Pill
-                                                        let counter_bg = if app.dark_mode {
-                                                            egui::Color32::from_black_alpha(80)
-                                                        } else {
-                                                            egui::Color32::from_white_alpha(180)
-                                                        };
-                                                        egui::Frame::new()
-                                                            .fill(counter_bg)
-                                                            .corner_radius(egui::CornerRadius::same(8))
-                                                            .inner_margin(egui::Margin::symmetric(6, 1))
-                                                            .show(ui, |ui| {
-                                                                ui.label(
-                                                                    egui::RichText::new(format!("{}", count))
-                                                                        .size(10.5)
+                                                            // Category Name (Click to toggle filter)
+                                                            let name_resp = ui.add(
+                                                                egui::Label::new(
+                                                                    egui::RichText::new(&cat.name)
+                                                                        .strong()
+                                                                        .small()
                                                                         .color(if app.dark_mode {
-                                                                            egui::Color32::from_gray(190)
+                                                                            egui::Color32::WHITE
                                                                         } else {
-                                                                            egui::Color32::from_gray(60)
+                                                                            egui::Color32::BLACK
                                                                         }),
-                                                                );
+                                                                )
+                                                                .sense(egui::Sense::click()),
+                                                            )
+                                                            .on_hover_text(if is_active_filter {
+                                                                "Active filter — click to clear filter"
+                                                            } else {
+                                                                "Click to filter shortcuts by this category"
                                                             });
 
-                                                        // Delete frameless button
-                                                        let del_btn = egui::Button::new(
-                                                            egui::RichText::new(regular::TRASH)
-                                                                .size(12.0)
-                                                                .color(if app.dark_mode {
-                                                                    egui::Color32::from_gray(160)
+                                                            if name_resp.clicked() {
+                                                                if is_active_filter {
+                                                                    cat_to_filter = Some("clear".to_string());
                                                                 } else {
-                                                                    egui::Color32::from_gray(100)
-                                                                }),
-                                                        )
-                                                        .frame(false);
+                                                                    cat_to_filter = Some(cat.id.clone());
+                                                                }
+                                                            }
 
-                                                        if ui
-                                                            .add(del_btn)
-                                                            .on_hover_text(format!("Delete category '{}'", cat.name))
-                                                            .clicked()
-                                                        {
-                                                            cat_to_delete = Some(cat.id.clone());
-                                                        }
+                                                            // Counter Pill
+                                                            let counter_bg = if app.dark_mode {
+                                                                egui::Color32::from_black_alpha(80)
+                                                            } else {
+                                                                egui::Color32::from_white_alpha(180)
+                                                            };
+                                                            egui::Frame::new()
+                                                                .fill(counter_bg)
+                                                                .corner_radius(egui::CornerRadius::same(8))
+                                                                .inner_margin(egui::Margin::symmetric(6, 1))
+                                                                .show(ui, |ui| {
+                                                                    ui.label(
+                                                                        egui::RichText::new(format!("{}", count))
+                                                                            .size(10.5)
+                                                                            .color(if app.dark_mode {
+                                                                                egui::Color32::from_gray(190)
+                                                                            } else {
+                                                                                egui::Color32::from_gray(60)
+                                                                            }),
+                                                                    );
+                                                                });
+
+                                                            // Delete frameless button
+                                                            let del_btn = egui::Button::new(
+                                                                egui::RichText::new(regular::TRASH)
+                                                                    .size(12.0)
+                                                                    .color(if app.dark_mode {
+                                                                        egui::Color32::from_gray(160)
+                                                                    } else {
+                                                                        egui::Color32::from_gray(100)
+                                                                    }),
+                                                            )
+                                                            .frame(false);
+
+                                                            if ui
+                                                                .add(del_btn)
+                                                                .on_hover_text(format!("Delete category '{}'", cat.name))
+                                                                .clicked()
+                                                            {
+                                                                cat_to_delete = Some(cat.id.clone());
+                                                            }
+                                                        });
                                                     });
-                                                });
-                                        }
-
-                                        if let Some(id) = cat_to_delete {
-                                            if app.shortcut_category_filter.as_deref() == Some(&id) {
-                                                app.shortcut_category_filter = None;
                                             }
-                                            app.delete_shortcut_category(&id);
-                                        }
+                                        });
+                                        ui.add_space(4.0);
+                                    }
 
-                                        if let Some(id) = cat_to_filter {
-                                            if id == "clear" {
-                                                app.shortcut_category_filter = None;
-                                            } else {
-                                                app.shortcut_category_filter = Some(id);
-                                            }
+                                    if let Some(id) = cat_to_delete {
+                                        if app.shortcut_category_filter.as_deref() == Some(&id) {
+                                            app.shortcut_category_filter = None;
                                         }
-                                    });
+                                        app.delete_shortcut_category(&id);
+                                    }
+
+                                    if let Some(id) = cat_to_filter {
+                                        if id == "clear" {
+                                            app.shortcut_category_filter = None;
+                                        } else {
+                                            app.shortcut_category_filter = Some(id);
+                                        }
+                                    }
                                 }
 
                                 ui.add_space(8.0);
