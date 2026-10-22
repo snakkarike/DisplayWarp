@@ -8,12 +8,16 @@ mod monitor;
 mod svg_render;
 mod tray;
 mod ui;
+mod updater;
 mod window;
 
 use eframe::egui;
 use windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx};
 
 fn main() -> eframe::Result {
+    // Clean up any leftover update files from previous update/restart
+    updater::cleanup_old_executables();
+
     // 1. Set DPI Awareness (Per-Monitor V2) so we see actual physical pixels
     // instead of virtualized scaled coordinates.
     unsafe {

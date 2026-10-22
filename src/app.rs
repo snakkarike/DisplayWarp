@@ -95,6 +95,8 @@ pub struct WindowManagerApp {
     // ── Theme ──
     pub dark_mode: bool,
     pub theme: crate::ui::theme::Theme,
+    // ── Auto-Updater ──
+    pub updater: crate::updater::UpdateManager,
     // ── Startup State ──
     pub first_frame_hidden: bool,
 }
@@ -154,6 +156,7 @@ impl Default for WindowManagerApp {
             status_log: Arc::new(parking_lot::Mutex::new(vec!["Ready.".to_string()])),
             dark_mode: true,
             theme: crate::ui::theme::Theme::new(true),
+            updater: crate::updater::UpdateManager::new(),
             first_frame_hidden: false,
         };
         app.refresh_monitors();
@@ -161,6 +164,10 @@ impl Default for WindowManagerApp {
         app.refresh_live_processes();
         app.refresh_desktop_shortcuts();
         app.load_data();
+
+        if app.data.lock().check_updates_on_startup {
+            app.updater.check_for_updates();
+        }
 
         // Start the background watcher thread.
         Self::start_watcher(Arc::clone(&data), Arc::clone(&watcher_running));
@@ -551,12 +558,19 @@ impl WindowManagerApp {
     fn start_watcher(data: Arc<parking_lot::Mutex<SavedData>>, running: Arc<AtomicBool>) {
         std::thread::spawn(move || {
             while running.load(Ordering::Relaxed) {
-                // Dynamically grab the user interval to sleep
-                let sleep_duration = { data.lock().watcher_interval_secs };
+                // Dynamically grab the user interval and enabled state
+                let (sleep_duration, enabled) = {
+                    let d = data.lock();
+                    (d.watcher_interval_secs, d.watcher_enabled)
+                };
 
-                std::thread::sleep(std::time::Duration::from_secs(sleep_duration));
+                std::thread::sleep(std::time::Duration::from_secs(sleep_duration.max(1)));
                 if !running.load(Ordering::Relaxed) {
                     break;
+                }
+
+                if !enabled {
+                    continue;
                 }
 
                 let profiles: Vec<AppProfile> = { data.lock().profiles.clone() };

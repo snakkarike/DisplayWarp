@@ -37,6 +37,7 @@
 - **Window Process Tracking** — For launchers that spawn a child process (e.g. Battle.net → game), specify the child EXE name and DisplayWarp will wait for that window instead.
 - **Persistent Profiles** — Profiles are saved to `monitor_config.json` next to the exe and survive restarts.
 - **Desktop Shortcut Layouts** — Save the exact positions of all desktop icons and shortcuts across your monitors and restore them with one click or directly from the system tray.
+- **In-App Automatic Updates** — Check for new GitHub releases directly in the Settings tab, download updates with progress indicator, and restart seamlessly.
 - **Zero Dependencies at Runtime** — Ships as a single `.exe`. No runtimes, no installers, no admin rights required for normal use.
 
 ---

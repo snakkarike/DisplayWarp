@@ -217,6 +217,14 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availabl
                                 }
                             }
 
+                            ui.add_space(4.0);
+                            if ui
+                                .checkbox(&mut data.check_updates_on_startup, "Automatically check for updates on startup")
+                                .clicked()
+                            {
+                                dirty = true;
+                            }
+
                             if dirty {
                                 drop(data);
                                 app.save_data();
@@ -249,36 +257,105 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availabl
                         ))
                         .show(ui, |ui| {
                             ui.set_width(ui.available_width());
-                            ui.label(egui::RichText::new("Background Watcher Interval").strong());
-                            ui.add_space(4.0);
 
                             let mut data = app.data.lock();
                             let mut dirty = false;
-                            let mut interval = data.watcher_interval_secs;
+
+                            ui.horizontal(|ui| {
+                                ui.label(egui::RichText::new("Background Window Watcher").strong());
+                                let is_enabled = data.watcher_enabled;
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    let badge_bg = if is_enabled {
+                                        if app.dark_mode {
+                                            egui::Color32::from_rgb(22, 101, 52)
+                                        } else {
+                                            egui::Color32::from_rgb(220, 252, 231)
+                                        }
+                                    } else {
+                                        if app.dark_mode {
+                                            egui::Color32::from_rgb(55, 65, 81)
+                                        } else {
+                                            egui::Color32::from_rgb(243, 244, 246)
+                                        }
+                                    };
+                                    let badge_fg = if is_enabled {
+                                        if app.dark_mode {
+                                            egui::Color32::from_rgb(134, 239, 172)
+                                        } else {
+                                            egui::Color32::from_rgb(21, 128, 61)
+                                        }
+                                    } else {
+                                        if app.dark_mode {
+                                            egui::Color32::from_gray(180)
+                                        } else {
+                                            egui::Color32::from_gray(100)
+                                        }
+                                    };
+                                    egui::Frame::new()
+                                        .fill(badge_bg)
+                                        .corner_radius(egui::CornerRadius::same(10))
+                                        .inner_margin(egui::Margin::symmetric(8, 2))
+                                        .show(ui, |ui| {
+                                            ui.label(
+                                                egui::RichText::new(if is_enabled { "Active" } else { "Disabled" })
+                                                    .size(10.5)
+                                                    .color(badge_fg),
+                                            );
+                                        });
+                                });
+                            });
+                            ui.add_space(6.0);
+
                             if ui
-                                .add(egui::Slider::new(&mut interval, 1..=30).suffix(" seconds"))
-                                .changed()
+                                .checkbox(&mut data.watcher_enabled, "Enable background window watcher")
+                                .on_hover_text("When enabled, DisplayWarp scans in the background to ensure persistent profile windows stay on their assigned monitors.")
+                                .clicked()
                             {
-                                data.watcher_interval_secs = interval;
                                 dirty = true;
                             }
 
+                            if data.watcher_enabled {
+                                ui.add_space(6.0);
+                                ui.label(egui::RichText::new("Scan Interval:").small());
+                                let mut interval = data.watcher_interval_secs;
+                                if ui
+                                    .add(egui::Slider::new(&mut interval, 1..=30).suffix(" seconds"))
+                                    .changed()
+                                {
+                                    data.watcher_interval_secs = interval;
+                                    dirty = true;
+                                }
+
+                                ui.add_space(4.0);
+                                ui.label(
+                                    egui::RichText::new("Controls how often DisplayWarp scans application placement to enforce persistence rules. Higher intervals save CPU.")
+                                        .size(11.0)
+                                        .color(egui::Color32::from_gray(140)),
+                                );
+                            } else {
+                                ui.add_space(4.0);
+                                ui.label(
+                                    egui::RichText::new("Watcher is currently disabled. DisplayWarp will not scan or reposition windows in the background, minimizing CPU and battery usage.")
+                                        .size(11.0)
+                                        .color(egui::Color32::from_gray(140)),
+                                );
+                            }
+
                             if dirty {
+                                let enabled = data.watcher_enabled;
+                                let interval = data.watcher_interval_secs;
                                 drop(data);
                                 app.save_data();
                                 crate::app::WindowManagerApp::push_status(
                                     &app.status_message,
                                     &app.status_log,
-                                    format!("⚙️ Watcher interval set to {}s.", interval),
+                                    if enabled {
+                                        format!("⚙️ Background watcher enabled ({}s interval).", interval)
+                                    } else {
+                                        "⚙️ Background watcher disabled.".to_string()
+                                    },
                                 );
                             }
-
-                            ui.add_space(6.0);
-                            ui.label(
-                                egui::RichText::new("Controls how often DisplayWarp scans application placement to enforce persistence rules. Lower speeds save CPU.")
-                                    .size(11.0)
-                                    .color(egui::Color32::from_gray(140)),
-                            );
                         });
 
                     ui.add_space(8.0);
@@ -430,7 +507,225 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availabl
                             egui::Color32::from_gray(70)
                         }),
                     );
-                    ui.add_space(12.0);
+                    ui.add_space(10.0);
+
+                    // ── Software Updates Card ──
+                    let update_status = app.updater.status.lock().clone();
+                    let is_busy = app.updater.is_busy.load(std::sync::atomic::Ordering::SeqCst);
+
+                    let card_bg = match &update_status {
+                        crate::updater::UpdateStatus::UpdateAvailable { .. } => {
+                            if app.dark_mode {
+                                egui::Color32::from_rgb(45, 30, 65)
+                            } else {
+                                egui::Color32::from_rgb(243, 232, 255)
+                            }
+                        }
+                        crate::updater::UpdateStatus::ReadyToRestart { .. } => {
+                            if app.dark_mode {
+                                egui::Color32::from_rgb(20, 50, 30)
+                            } else {
+                                egui::Color32::from_rgb(236, 253, 245)
+                            }
+                        }
+                        _ => {
+                            if app.dark_mode {
+                                egui::Color32::from_rgb(32, 32, 32)
+                            } else {
+                                egui::Color32::from_rgb(241, 245, 249)
+                            }
+                        }
+                    };
+
+                    let card_stroke = match &update_status {
+                        crate::updater::UpdateStatus::UpdateAvailable { .. } => {
+                            egui::Stroke::new(1.0, egui::Color32::from_rgb(147, 51, 234))
+                        }
+                        crate::updater::UpdateStatus::ReadyToRestart { .. } => {
+                            egui::Stroke::new(1.0, egui::Color32::from_rgb(34, 197, 94))
+                        }
+                        _ => egui::Stroke::new(
+                            1.0,
+                            if app.dark_mode {
+                                egui::Color32::from_rgb(48, 48, 48)
+                            } else {
+                                egui::Color32::from_rgb(226, 232, 240)
+                            },
+                        ),
+                    };
+
+                    egui::Frame::group(ui.style())
+                        .inner_margin(egui::Margin::symmetric(10, 8))
+                        .corner_radius(egui::CornerRadius::same(6))
+                        .fill(card_bg)
+                        .stroke(card_stroke)
+                        .show(ui, |ui| {
+                            ui.set_width(ui.available_width());
+                            match &update_status {
+                                crate::updater::UpdateStatus::Idle => {
+                                    ui.horizontal(|ui| {
+                                        ui.label(
+                                            egui::RichText::new("Check for new DisplayWarp releases.")
+                                                .small()
+                                                .color(egui::Color32::GRAY),
+                                        );
+                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                            if ui
+                                                .button(format!("{} Check for Updates", regular::ARROWS_CLOCKWISE))
+                                                .clicked()
+                                            {
+                                                app.updater.check_for_updates();
+                                            }
+                                        });
+                                    });
+                                }
+                                crate::updater::UpdateStatus::Checking => {
+                                    ui.horizontal(|ui| {
+                                        ui.spinner();
+                                        ui.label(egui::RichText::new("Checking GitHub for updates...").small());
+                                    });
+                                }
+                                crate::updater::UpdateStatus::UpToDate { checked_version } => {
+                                    ui.horizontal(|ui| {
+                                        ui.label(
+                                            egui::RichText::new(format!("{} Up to date (v{})", regular::CHECK, checked_version))
+                                                .small()
+                                                .color(egui::Color32::from_rgb(34, 197, 94)),
+                                        );
+                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                            if ui
+                                                .button(format!("{} Check Again", regular::ARROWS_CLOCKWISE))
+                                                .clicked()
+                                            {
+                                                app.updater.check_for_updates();
+                                            }
+                                        });
+                                    });
+                                }
+                                crate::updater::UpdateStatus::UpdateAvailable {
+                                    version,
+                                    release_name: _,
+                                    release_notes: _,
+                                    download_url,
+                                    html_url,
+                                    asset_size,
+                                } => {
+                                    ui.vertical(|ui| {
+                                        ui.horizontal(|ui| {
+                                            ui.label(
+                                                egui::RichText::new(format!("🎉 New Release Available: v{}", version))
+                                                    .strong()
+                                                    .color(if app.dark_mode {
+                                                        egui::Color32::from_rgb(216, 180, 254)
+                                                    } else {
+                                                        egui::Color32::from_rgb(126, 34, 206)
+                                                    }),
+                                            );
+                                            if *asset_size > 0 {
+                                                let mb = *asset_size as f64 / (1024.0 * 1024.0);
+                                                ui.label(
+                                                    egui::RichText::new(format!("({:.1} MB)", mb))
+                                                        .small()
+                                                        .color(egui::Color32::GRAY),
+                                                );
+                                            }
+                                        });
+
+                                        ui.add_space(4.0);
+                                        ui.horizontal(|ui| {
+                                            let update_btn = egui::Button::new(
+                                                egui::RichText::new(format!("{} Download & Install", regular::DOWNLOAD_SIMPLE))
+                                                    .color(egui::Color32::WHITE),
+                                            )
+                                            .fill(if app.dark_mode {
+                                                egui::Color32::from_rgb(109, 40, 217)
+                                            } else {
+                                                egui::Color32::from_rgb(124, 58, 237)
+                                            });
+
+                                            if ui.add(update_btn).clicked() && !is_busy {
+                                                app.updater.start_download(version.clone(), download_url.clone());
+                                            }
+
+                                            if !html_url.is_empty() {
+                                                if ui
+                                                    .button(format!("{} Release Notes", regular::EXPORT))
+                                                    .clicked()
+                                                {
+                                                    let _ = std::process::Command::new("cmd")
+                                                        .args(&["/C", "start", html_url])
+                                                        .spawn();
+                                                }
+                                            }
+                                        });
+                                    });
+                                }
+                                crate::updater::UpdateStatus::Downloading {
+                                    version,
+                                    downloaded_bytes,
+                                    total_bytes,
+                                    progress,
+                                } => {
+                                    ui.vertical(|ui| {
+                                        ui.horizontal(|ui| {
+                                            ui.spinner();
+                                            let downloaded_mb = *downloaded_bytes as f64 / (1024.0 * 1024.0);
+                                            let total_mb = *total_bytes as f64 / (1024.0 * 1024.0);
+                                            if *total_bytes > 0 {
+                                                ui.label(format!(
+                                                    "Downloading v{}... ({:.1} / {:.1} MB)",
+                                                    version, downloaded_mb, total_mb
+                                                ));
+                                            } else {
+                                                ui.label(format!("Downloading v{}... ({:.1} MB)", version, downloaded_mb));
+                                            }
+                                        });
+                                        ui.add_space(4.0);
+                                        ui.add(egui::ProgressBar::new(*progress).animate(true));
+                                    });
+                                }
+                                crate::updater::UpdateStatus::ReadyToRestart { version } => {
+                                    ui.vertical(|ui| {
+                                        ui.label(
+                                            egui::RichText::new(format!(
+                                                "{} Version v{} downloaded and ready to install!",
+                                                regular::CHECK,
+                                                version
+                                            ))
+                                            .strong()
+                                            .color(egui::Color32::from_rgb(34, 197, 94)),
+                                        );
+                                        ui.add_space(4.0);
+                                        let restart_btn = egui::Button::new(
+                                            egui::RichText::new(format!("{} Restart & Apply Update", regular::ARROWS_CLOCKWISE))
+                                                .color(egui::Color32::WHITE),
+                                        )
+                                        .fill(egui::Color32::from_rgb(22, 101, 52));
+
+                                        if ui.add(restart_btn).clicked() {
+                                            if let Err(e) = crate::updater::UpdateManager::apply_and_restart() {
+                                                *app.updater.status.lock() = crate::updater::UpdateStatus::Error(e);
+                                            }
+                                        }
+                                    });
+                                }
+                                crate::updater::UpdateStatus::Error(err) => {
+                                    ui.horizontal(|ui| {
+                                        ui.label(
+                                            egui::RichText::new(format!("⚠️ {}", err))
+                                                .small()
+                                                .color(egui::Color32::from_rgb(239, 68, 68)),
+                                        );
+                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                            if ui.button("Retry").clicked() {
+                                                app.updater.check_for_updates();
+                                            }
+                                        });
+                                    });
+                                }
+                            }
+                        });
+                    ui.add_space(10.0);
 
                     ui.separator();
                     ui.add_space(8.0);

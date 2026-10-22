@@ -84,6 +84,8 @@ pub struct SavedData {
     pub start_minimized: bool,
     #[serde(default)]
     pub start_on_boot: bool,
+    #[serde(default = "default_true")]
+    pub watcher_enabled: bool,
     #[serde(default = "default_watcher_interval")]
     pub watcher_interval_secs: u64,
     #[serde(default)]
@@ -94,6 +96,8 @@ pub struct SavedData {
     pub shortcut_categories: Vec<ShortcutCategory>,
     #[serde(default)]
     pub shortcut_category_assignments: std::collections::HashMap<String, String>,
+    #[serde(default = "default_true")]
+    pub check_updates_on_startup: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -172,13 +176,19 @@ impl Default for SavedData {
             close_to_tray: false,
             start_minimized: false,
             start_on_boot: false,
+            watcher_enabled: true,
             watcher_interval_secs: 3,
             display_profiles: vec![],
             shortcut_layouts: vec![],
             shortcut_categories: vec![],
             shortcut_category_assignments: std::collections::HashMap::new(),
+            check_updates_on_startup: true,
         }
     }
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_watcher_interval() -> u64 {

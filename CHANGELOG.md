@@ -1,3 +1,40 @@
+## v1.1.2
+
+### ✨ New Features
+
+- **Desktop Shortcuts Tab & Layout Management**: Added a dedicated **Shortcuts** tab to capture, organize, and restore desktop icon positions across single or multi-monitor setups.
+  - **Live Shortcut Scanner**: Inspect real-time desktop icon coordinates mapped to their physical monitors.
+  - **Layout Snapshots**: Save named layouts or instant timestamped snapshots.
+  - **One-Click Desktop Restore**: Restore icon layouts instantly with accurate coordinate positioning in Windows Explorer.
+  - **Search & Multi-Monitor Filtering**: Filter shortcuts by name, monitor, or assigned category with instant count badges.
+  - **Comprehensive Sorting**: Sort shortcuts by **Default (Position)**, **Name (A-Z / Z-A)**, or **Category (A-Z / Z-A)** with stylish category group headers and divider lines.
+- **Custom Shortcut Categories & Color Tagging**:
+  - Organize desktop shortcuts into custom groups with rich color palette swatches.
+  - Interactive filter pills with shortcut counters and quick-tagging dropdowns.
+  - Built-in "Load Suggestions" for common categories (Games, Work, Utilities, Media, System).
+- **In-App Automatic Updates**:
+  - Embedded Software Updates card in the Settings tab with live GitHub release checking.
+  - One-click background binary download with real-time download progress bar.
+  - Seamless in-place Windows executable replacement and auto-restart.
+  - Automatic cleanup of temporary update files on startup.
+  - "Automatically check for updates on startup" preference in Application Behavior settings.
+- **Background Window Watcher Control**:
+  - Added option to enable or disable the background window watcher.
+  - Real-time `Active` / `Disabled` status badge and configurable scan interval (1–30s).
+  - Completely pauses background window scans when disabled to conserve CPU and battery.
+- **Automated CI/CD Release Workflow**:
+  - Added GitHub Actions workflow (`.github/workflows/release.yml`) to automatically compile release binaries, package distribution `.zip` archives, and publish GitHub Releases on pushing to the `release` branch.
+
+### 📦 Dependency & Framework Upgrades
+
+- **Egui & Eframe 0.37**: Upgraded `eframe` and `egui_extras` to 0.37 for improved rendering performance, smoother UI layouts, and enhanced text shaping.
+- **Windows API Upgrades**: Updated `windows` to `0.62.2` and `windows-sys` to `0.61.2` for improved stability and COM interop with modern Windows 11 APIs.
+- **Rust 2024 Edition**: Migrated project configuration to Rust 2024 edition.
+- **Lightweight Networking**: Integrated `ureq` (2.12) with native JSON handling for minimal-footprint, non-blocking GitHub release downloads without binary bloat.
+- **System Integration**: Integrated `auto-launch` (0.6.0) and `egui_taffy` (0.16).
+
+---
+
 ## v1.1.1
 
 ### ✨ New Features
