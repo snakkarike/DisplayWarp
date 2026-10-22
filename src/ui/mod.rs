@@ -3,6 +3,7 @@ pub mod helpers;
 pub mod log_tab;
 pub mod monitor_preview;
 pub mod settings_tab;
+pub mod shortcuts_tab;
 pub mod warp_tab;
 
 use eframe::egui;
@@ -151,6 +152,7 @@ impl eframe::App for WindowManagerApp {
 
                     ui.selectable_value(&mut self.current_tab, AppTab::Warp, "Warp");
                     ui.selectable_value(&mut self.current_tab, AppTab::Display, "Display");
+                    ui.selectable_value(&mut self.current_tab, AppTab::Shortcuts, "Shortcuts");
                     ui.selectable_value(&mut self.current_tab, AppTab::Log, "Log");
                     ui.selectable_value(&mut self.current_tab, AppTab::Settings, "Settings");
                 });
@@ -173,6 +175,10 @@ impl eframe::App for WindowManagerApp {
                     let available_h = ui.available_rect_before_wrap().height();
                     display_tab::draw_display_tab(self, ui, available_h);
                 }
+                AppTab::Shortcuts => {
+                    let available_h = ui.available_rect_before_wrap().height();
+                    shortcuts_tab::draw_shortcuts_tab(self, ui, available_h);
+                }
                 AppTab::Log => {
                     egui::ScrollArea::vertical()
                         .auto_shrink([false; 2])
@@ -187,7 +193,7 @@ impl eframe::App for WindowManagerApp {
                                     egui::Color32::from_rgb(248, 250, 252)
                                 })
                                 .stroke(egui::Stroke::new(
-                                    1.0,
+                                    1.0_f32,
                                     if self.dark_mode {
                                         egui::Color32::from_rgb(44, 44, 44)
                                     } else {

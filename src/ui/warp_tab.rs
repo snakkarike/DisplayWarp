@@ -70,22 +70,14 @@ pub fn draw_profiles_list(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
         if i > 0 {
             app.data.lock().profiles.swap(i, i - 1);
             app.save_data();
-            let profiles = app.data.lock().profiles.clone();
-            let display_profiles = app.data.lock().display_profiles.clone();
-            if let Some(t) = &app.tray {
-                t.refresh_menu(&profiles, &display_profiles);
-            }
+            app.refresh_tray();
         }
     }
     if let Some(i) = to_move_down {
         if i < profiles_len - 1 {
             app.data.lock().profiles.swap(i, i + 1);
             app.save_data();
-            let profiles = app.data.lock().profiles.clone();
-            let display_profiles = app.data.lock().display_profiles.clone();
-            if let Some(t) = &app.tray {
-                t.refresh_menu(&profiles, &display_profiles);
-            }
+            app.refresh_tray();
         }
     }
 
@@ -94,11 +86,7 @@ pub fn draw_profiles_list(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
         app.data.lock().profiles.remove(i);
         app.save_data();
         // Refresh tray so deleted profile is removed from tray menu
-        let profiles = app.data.lock().profiles.clone();
-        let display_profiles = app.data.lock().display_profiles.clone();
-        if let Some(t) = &app.tray {
-            t.refresh_menu(&profiles, &display_profiles);
-        }
+        app.refresh_tray();
         WindowManagerApp::push_status(
             &app.status_message,
             &app.status_log,
@@ -128,7 +116,7 @@ fn draw_profile_card(
             egui::Color32::from_rgb(241, 245, 249)
         })
         .stroke(egui::Stroke::new(
-            1.0,
+            1.0_f32,
             if app.dark_mode {
                 egui::Color32::from_rgb(44, 44, 44)
             } else {
@@ -346,7 +334,7 @@ fn draw_edit_profile_form(
             egui::Color32::from_rgb(254, 242, 242)
         })
         .stroke(egui::Stroke::new(
-            1.5,
+            1.5_f32,
             if app.dark_mode {
                 egui::Color32::from_rgb(239, 68, 68)
             } else {
@@ -373,7 +361,7 @@ fn draw_edit_profile_form(
                     egui::Color32::from_rgb(241, 245, 249)
                 })
                 .stroke(egui::Stroke::new(
-                    1.0,
+                    1.0_f32,
                     if app.dark_mode {
                         egui::Color32::from_rgb(44, 44, 44)
                     } else {
@@ -404,7 +392,7 @@ fn draw_edit_profile_form(
                     egui::Color32::from_rgb(241, 245, 249)
                 })
                 .stroke(egui::Stroke::new(
-                    1.0,
+                    1.0_f32,
                     if app.dark_mode {
                         egui::Color32::from_rgb(44, 44, 44)
                     } else {
@@ -452,7 +440,7 @@ fn draw_edit_profile_form(
                     egui::Color32::from_rgb(241, 245, 249)
                 })
                 .stroke(egui::Stroke::new(
-                    1.0,
+                    1.0_f32,
                     if app.dark_mode {
                         egui::Color32::from_rgb(44, 44, 44)
                     } else {
@@ -507,7 +495,7 @@ fn draw_edit_profile_form(
                     egui::Color32::from_rgb(241, 245, 249)
                 })
                 .stroke(egui::Stroke::new(
-                    1.0,
+                    1.0_f32,
                     if app.dark_mode {
                         egui::Color32::from_rgb(44, 44, 44)
                     } else {
@@ -538,7 +526,7 @@ fn draw_edit_profile_form(
                     egui::Color32::from_rgb(241, 245, 249)
                 })
                 .stroke(egui::Stroke::new(
-                    1.0,
+                    1.0_f32,
                     if app.dark_mode {
                         egui::Color32::from_rgb(44, 44, 44)
                     } else {
@@ -573,7 +561,7 @@ fn draw_edit_profile_form(
                     egui::Color32::from_rgb(241, 245, 249)
                 })
                 .stroke(egui::Stroke::new(
-                    1.0,
+                    1.0_f32,
                     if app.dark_mode {
                         egui::Color32::from_rgb(44, 44, 44)
                     } else {
@@ -608,7 +596,7 @@ fn draw_edit_profile_form(
                     egui::Color32::from_rgb(241, 245, 249)
                 })
                 .stroke(egui::Stroke::new(
-                    1.0,
+                    1.0_f32,
                     if app.dark_mode {
                         egui::Color32::from_rgb(44, 44, 44)
                     } else {
@@ -731,11 +719,7 @@ fn draw_edit_profile_form(
                         drop(data);
                         app.save_data();
                         // Refresh tray after profile edit
-                        let profiles = app.data.lock().profiles.clone();
-                        let display_profiles = app.data.lock().display_profiles.clone();
-                        if let Some(t) = &app.tray {
-                            t.refresh_menu(&profiles, &display_profiles);
-                        }
+                        app.refresh_tray();
                         WindowManagerApp::push_status(
                             &app.status_message,
                             &app.status_log,
@@ -805,7 +789,7 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             egui::Color32::from_rgb(241, 245, 249)
         })
         .stroke(egui::Stroke::new(
-            1.0,
+            1.0_f32,
             if app.dark_mode {
                 egui::Color32::from_rgb(44, 44, 44)
             } else {
@@ -859,7 +843,7 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             egui::Color32::from_rgb(241, 245, 249)
         })
         .stroke(egui::Stroke::new(
-            1.0,
+            1.0_f32,
             if app.dark_mode {
                 egui::Color32::from_rgb(44, 44, 44)
             } else {
@@ -891,7 +875,7 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             egui::Color32::from_rgb(241, 245, 249)
         })
         .stroke(egui::Stroke::new(
-            1.0,
+            1.0_f32,
             if app.dark_mode {
                 egui::Color32::from_rgb(44, 44, 44)
             } else {
@@ -947,7 +931,7 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             egui::Color32::from_rgb(241, 245, 249)
         })
         .stroke(egui::Stroke::new(
-            1.0,
+            1.0_f32,
             if app.dark_mode {
                 egui::Color32::from_rgb(44, 44, 44)
             } else {
@@ -1004,7 +988,7 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             egui::Color32::from_rgb(241, 245, 249)
         })
         .stroke(egui::Stroke::new(
-            1.0,
+            1.0_f32,
             if app.dark_mode {
                 egui::Color32::from_rgb(44, 44, 44)
             } else {
@@ -1050,7 +1034,7 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             egui::Color32::from_rgb(241, 245, 249)
         })
         .stroke(egui::Stroke::new(
-            1.0,
+            1.0_f32,
             if app.dark_mode {
                 egui::Color32::from_rgb(44, 44, 44)
             } else {
@@ -1178,11 +1162,7 @@ pub fn draw_new_profile_form(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             app.new_profile_audio_device_idx = 0;
             app.save_data();
             // Refresh tray so new profile appears in tray menu
-            let profiles = app.data.lock().profiles.clone();
-            let display_profiles = app.data.lock().display_profiles.clone();
-            if let Some(t) = &app.tray {
-                t.refresh_menu(&profiles, &display_profiles);
-            }
+            app.refresh_tray();
             WindowManagerApp::push_status(
                 &app.status_message,
                 &app.status_log,
@@ -1223,7 +1203,7 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             egui::Color32::from_rgb(241, 245, 249)
         })
         .stroke(egui::Stroke::new(
-            1.0,
+            1.0_f32,
             if app.dark_mode {
                 egui::Color32::from_rgb(44, 44, 44)
             } else {
@@ -1270,7 +1250,7 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             egui::Color32::from_rgb(241, 245, 249)
         })
         .stroke(egui::Stroke::new(
-            1.0,
+            1.0_f32,
             if app.dark_mode {
                 egui::Color32::from_rgb(44, 44, 44)
             } else {
@@ -1382,11 +1362,7 @@ pub fn draw_live_process_mover(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                     });
                     app.save_data();
                     // Refresh tray so quick-created profile appears in tray menu
-                    let profiles = app.data.lock().profiles.clone();
-                    let display_profiles = app.data.lock().display_profiles.clone();
-                    if let Some(t) = &app.tray {
-                        t.refresh_menu(&profiles, &display_profiles);
-                    }
+                    app.refresh_tray();
                     WindowManagerApp::push_status(
                         &app.status_message,
                         &app.status_log,
@@ -1445,7 +1421,7 @@ pub fn draw_warp_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                     egui::Color32::from_rgb(248, 250, 252)
                 })
                 .stroke(egui::Stroke::new(
-                    1.0,
+                    1.0_f32,
                     if app.dark_mode {
                         egui::Color32::from_rgb(44, 44, 44)
                     } else {
@@ -1471,7 +1447,7 @@ pub fn draw_warp_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                     egui::Color32::from_rgb(248, 250, 252)
                 })
                 .stroke(egui::Stroke::new(
-                    1.0,
+                    1.0_f32,
                     if app.dark_mode {
                         egui::Color32::from_rgb(44, 44, 44)
                     } else {
@@ -1497,7 +1473,7 @@ pub fn draw_warp_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                     egui::Color32::from_rgb(248, 250, 252)
                 })
                 .stroke(egui::Stroke::new(
-                    1.0,
+                    1.0_f32,
                     if app.dark_mode {
                         egui::Color32::from_rgb(44, 44, 44)
                     } else {

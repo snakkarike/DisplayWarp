@@ -18,7 +18,7 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                     egui::Color32::from_rgb(248, 250, 252)
                 })
                 .stroke(egui::Stroke::new(
-                    1.0,
+                    1.0_f32,
                     if app.dark_mode {
                         egui::Color32::from_rgb(44, 44, 44)
                     } else {
@@ -54,7 +54,7 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                             egui::Color32::from_rgb(241, 245, 249)
                         })
                         .stroke(egui::Stroke::new(
-                            1.0,
+                            1.0_f32,
                             if app.dark_mode {
                                 egui::Color32::from_rgb(44, 44, 44)
                             } else {
@@ -136,7 +136,7 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                             egui::Color32::from_rgb(241, 245, 249)
                         })
                         .stroke(egui::Stroke::new(
-                            1.0,
+                            1.0_f32,
                             if app.dark_mode {
                                 egui::Color32::from_rgb(44, 44, 44)
                             } else {
@@ -170,7 +170,7 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                             egui::Color32::from_rgb(241, 245, 249)
                         })
                         .stroke(egui::Stroke::new(
-                            1.0,
+                            1.0_f32,
                             if app.dark_mode {
                                 egui::Color32::from_rgb(44, 44, 44)
                             } else {
@@ -237,7 +237,7 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                             egui::Color32::from_rgb(241, 245, 249)
                         })
                         .stroke(egui::Stroke::new(
-                            1.0,
+                            1.0_f32,
                             if app.dark_mode {
                                 egui::Color32::from_rgb(44, 44, 44)
                             } else {
@@ -290,7 +290,7 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                             egui::Color32::from_rgb(241, 245, 249)
                         })
                         .stroke(egui::Stroke::new(
-                            1.0,
+                            1.0_f32,
                             if app.dark_mode {
                                 egui::Color32::from_rgb(44, 44, 44)
                             } else {
@@ -377,7 +377,7 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
                     egui::Color32::from_rgb(248, 250, 252)
                 })
                 .stroke(egui::Stroke::new(
-                    1.0,
+                    1.0_f32,
                     if app.dark_mode {
                         egui::Color32::from_rgb(44, 44, 44)
                     } else {

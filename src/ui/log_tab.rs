@@ -40,7 +40,7 @@ pub fn draw_status_bar(app: &mut WindowManagerApp, ui: &mut egui::Ui) {
             egui::Color32::from_rgb(241, 245, 249)
         })
         .stroke(egui::Stroke::new(
-            1.0,
+            1.0_f32,
             if app.dark_mode {
                 egui::Color32::from_gray(45)
             } else {

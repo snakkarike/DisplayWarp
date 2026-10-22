@@ -161,6 +161,7 @@ fn apply_window_dark_mode(dark: bool) {
 pub struct TrayState {
     pub warp_ids: Vec<MenuId>,
     pub display_ids: Vec<MenuId>,
+    pub shortcut_ids: Vec<MenuId>,
 }
 
 pub struct TrayItems {
@@ -170,7 +171,12 @@ pub struct TrayItems {
 }
 
 impl TrayItems {
-    pub fn refresh_menu(&self, profiles: &[AppProfile], layouts: &[SavedDisplayLayout]) {
+    pub fn refresh_menu(
+        &self,
+        profiles: &[AppProfile],
+        layouts: &[SavedDisplayLayout],
+        shortcut_layouts: &[crate::desktop_icons::DesktopIconLayout],
+    ) {
         let dark = is_dark_mode();
 
         if dark {
@@ -219,6 +225,19 @@ impl TrayItems {
         }
         let _ = menu.append(&disp_sub);
 
+        let shortcut_sub = Submenu::new("📌  Shortcut Layouts", true);
+        if shortcut_layouts.is_empty() {
+            let empty = MenuItem::new(format!("{}(No shortcut layouts)", empty_icon), false, None);
+            let _ = shortcut_sub.append(&empty);
+        } else {
+            for s in shortcut_layouts {
+                let item = MenuItem::new(format!("{}{}", display_icon, s.name), true, None);
+                next_state.shortcut_ids.push(item.id().clone());
+                let _ = shortcut_sub.append(&item);
+            }
+        }
+        let _ = menu.append(&shortcut_sub);
+
         let _ = menu.append(&PredefinedMenuItem::separator());
         let _ = menu.append(&quit_item);
 
@@ -260,9 +279,13 @@ pub fn create_tray(
 
     let mut state = TrayState::default();
 
-    let (profiles_snapshot, layouts_snapshot) = {
+    let (profiles_snapshot, layouts_snapshot, shortcuts_snapshot) = {
         let d = data.lock();
-        (d.profiles.clone(), d.display_profiles.clone())
+        (
+            d.profiles.clone(),
+            d.display_profiles.clone(),
+            d.shortcut_layouts.clone(),
+        )
     };
 
     let warp_sub = Submenu::new("⚡  Warp Profiles", true);
@@ -290,6 +313,19 @@ pub fn create_tray(
         }
     }
     let _ = menu.append(&disp_sub);
+
+    let shortcut_sub = Submenu::new("📌  Shortcut Layouts", true);
+    if shortcuts_snapshot.is_empty() {
+        let empty = MenuItem::new(format!("{}(No shortcut layouts)", empty_icon), false, None);
+        let _ = shortcut_sub.append(&empty);
+    } else {
+        for s in &shortcuts_snapshot {
+            let item = MenuItem::new(format!("{}{}", display_icon, s.name), true, None);
+            state.shortcut_ids.push(item.id().clone());
+            let _ = shortcut_sub.append(&item);
+        }
+    }
+    let _ = menu.append(&shortcut_sub);
 
     let _ = menu.append(&PredefinedMenuItem::separator());
     let _ = menu.append(&quit_item);
@@ -344,6 +380,7 @@ pub fn create_tray(
                     // Check Display Profiles
                     for (idx, pid) in st.display_ids.iter().enumerate() {
                         if id == *pid {
+                            found = true;
                             let layout = {
                                 let d = data.lock();
                                 d.display_profiles.get(idx).cloned()
@@ -354,6 +391,43 @@ pub fn create_tray(
                                     Arc::clone(&status_message),
                                     Arc::clone(&status_log),
                                 );
+                            }
+                            break;
+                        }
+                    }
+                    if found {
+                        continue;
+                    }
+
+                    // Check Shortcut Layouts
+                    for (idx, pid) in st.shortcut_ids.iter().enumerate() {
+                        if id == *pid {
+                            let layout = {
+                                let d = data.lock();
+                                d.shortcut_layouts.get(idx).cloned()
+                            };
+                            if let Some(l) = layout {
+                                match crate::desktop_icons::restore_desktop_icons(&l.icons) {
+                                    Ok(restored) => {
+                                        crate::app::WindowManagerApp::push_status(
+                                            &status_message,
+                                            &status_log,
+                                            format!(
+                                                "✅ Restored {}/{} desktop shortcuts from '{}'.",
+                                                restored,
+                                                l.icons.len(),
+                                                l.name
+                                            ),
+                                        );
+                                    }
+                                    Err(e) => {
+                                        crate::app::WindowManagerApp::push_status(
+                                            &status_message,
+                                            &status_log,
+                                            format!("⚠️ Failed to restore shortcuts '{}': {:?}", l.name, e),
+                                        );
+                                    }
+                                }
                             }
                             break;
                         }

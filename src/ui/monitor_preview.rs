@@ -19,7 +19,7 @@ pub fn draw_monitor_preview(
             egui::Color32::from_rgb(248, 250, 252)
         })
         .stroke(egui::Stroke::new(
-            1.0,
+            1.0_f32,
             if app.dark_mode {
                 egui::Color32::from_rgb(44, 44, 44)
             } else {
@@ -62,7 +62,7 @@ pub fn draw_monitor_preview(
                                 };
                                 painter.line_segment(
                                     [egui::pos2(x, y), egui::pos2(x, next_y)],
-                                    egui::Stroke::new(1.0, color),
+                                    egui::Stroke::new(1.0_f32, color),
                                 );
                             }
                             y = next_y;
@@ -96,7 +96,7 @@ pub fn draw_monitor_preview(
                                 };
                                 painter.line_segment(
                                     [egui::pos2(x, y), egui::pos2(next_x, y)],
-                                    egui::Stroke::new(1.0, color),
+                                    egui::Stroke::new(1.0_f32, color),
                                 );
                             }
                             x = next_x;
@@ -171,7 +171,7 @@ pub fn draw_monitor_preview(
                         m_rect,
                         egui::CornerRadius::same(4),
                         egui::Stroke::new(
-                            if is_selected { 2.5 } else { 1.5 },
+                            if is_selected { 2.5 } else { 1.5_f32 },
                             if is_selected {
                                 egui::Color32::from_rgb(34, 197, 94)
                             } else {

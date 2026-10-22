@@ -18,8 +18,17 @@ use crate::window::{
 pub enum AppTab {
     Warp,
     Display,
+    Shortcuts,
     Log,
     Settings,
+}
+
+#[derive(PartialEq, Clone, Copy, Debug, Default)]
+pub enum ShortcutSortMode {
+    #[default]
+    Default,
+    NameAsc,
+    NameDesc,
 }
 
 pub struct WindowManagerApp {
@@ -54,6 +63,18 @@ pub struct WindowManagerApp {
     pub selected_display_idx: Option<usize>,
     pub drag_start_pos: Option<egui::Pos2>,
     pub original_monitor_rect: Option<windows::Win32::Foundation::RECT>,
+
+    // ── Desktop Shortcuts layout state ──
+    pub new_shortcut_layout_name: String,
+    pub shortcut_search_query: String,
+    pub shortcut_monitor_filter: Option<usize>,
+    pub shortcut_category_filter: Option<String>,
+    pub shortcut_sort_mode: ShortcutSortMode,
+    pub viewing_shortcut_layout_idx: Option<usize>,
+    pub managing_categories: bool,
+    pub new_category_name: String,
+    pub new_category_color: String,
+    pub live_desktop_shortcuts: Vec<crate::desktop_icons::DesktopIconPos>,
 
     // ── Persistent monitor watcher ──
     pub watcher_running: Arc<AtomicBool>,
@@ -108,6 +129,17 @@ impl Default for WindowManagerApp {
             drag_start_pos: None,
             original_monitor_rect: None,
 
+            new_shortcut_layout_name: String::new(),
+            shortcut_search_query: String::new(),
+            shortcut_monitor_filter: None,
+            shortcut_category_filter: None,
+            shortcut_sort_mode: ShortcutSortMode::Default,
+            viewing_shortcut_layout_idx: None,
+            managing_categories: false,
+            new_category_name: String::new(),
+            new_category_color: String::from("#10B981"),
+            live_desktop_shortcuts: vec![],
+
             watcher_running: Arc::clone(&watcher_running),
             tray: None,
 
@@ -125,6 +157,7 @@ impl Default for WindowManagerApp {
         app.refresh_monitors();
         app.refresh_audio_devices();
         app.refresh_live_processes();
+        app.refresh_desktop_shortcuts();
         app.load_data();
 
         // Start the background watcher thread.
@@ -289,6 +322,208 @@ impl WindowManagerApp {
         if let Ok(json) = serde_json::to_string_pretty(&*data) {
             let _ = std::fs::write(Self::get_config_path(), json);
         }
+    }
+
+    pub fn refresh_tray(&self) {
+        if let Some(t) = &self.tray {
+            let d = self.data.lock();
+            t.refresh_menu(&d.profiles, &d.display_profiles, &d.shortcut_layouts);
+        }
+    }
+
+    pub fn refresh_desktop_shortcuts(&mut self) {
+        match crate::desktop_icons::capture_desktop_icons() {
+            Ok(shortcuts) => {
+                let count = shortcuts.len();
+                self.live_desktop_shortcuts = shortcuts;
+                Self::push_status(
+                    &self.status_message,
+                    &self.status_log,
+                    format!("🔄 Detected {} desktop shortcuts.", count),
+                );
+            }
+            Err(e) => {
+                Self::push_status(
+                    &self.status_message,
+                    &self.status_log,
+                    format!("⚠️ Failed to detect desktop shortcuts: {:?}", e),
+                );
+            }
+        }
+    }
+
+    pub fn save_shortcut_layout(&mut self, name: &str) {
+        let name = name.trim();
+        if name.is_empty() {
+            return;
+        }
+        let mut icons = match crate::desktop_icons::capture_desktop_icons() {
+            Ok(icons) => icons,
+            Err(e) => {
+                Self::push_status(
+                    &self.status_message,
+                    &self.status_log,
+                    format!("⚠️ Failed to capture desktop shortcuts: {:?}", e),
+                );
+                return;
+            }
+        };
+        {
+            let data = self.data.lock();
+            for icon in &mut icons {
+                icon.category_id = data.shortcut_category_assignments.get(&icon.name).cloned();
+            }
+        }
+        let count = icons.len();
+        let timestamp = crate::desktop_icons::current_timestamp_string();
+        let layout = crate::desktop_icons::DesktopIconLayout {
+            name: name.to_string(),
+            created_at: timestamp,
+            icons,
+        };
+
+        {
+            let mut data = self.data.lock();
+            if let Some(pos) = data
+                .shortcut_layouts
+                .iter()
+                .position(|l| l.name.eq_ignore_ascii_case(name))
+            {
+                data.shortcut_layouts[pos] = layout;
+            } else {
+                data.shortcut_layouts.push(layout);
+            }
+        }
+        self.save_data();
+        self.refresh_tray();
+        Self::push_status(
+            &self.status_message,
+            &self.status_log,
+            format!("✅ Saved desktop shortcut layout '{}' ({} shortcuts).", name, count),
+        );
+    }
+
+    pub fn restore_shortcut_layout(&mut self, idx: usize) {
+        let layout = {
+            let data = self.data.lock();
+            data.shortcut_layouts.get(idx).cloned()
+        };
+        if let Some(layout) = layout {
+            {
+                let mut data = self.data.lock();
+                for icon in &layout.icons {
+                    if let Some(cat_id) = &icon.category_id {
+                        data.shortcut_category_assignments.insert(icon.name.clone(), cat_id.clone());
+                    }
+                }
+            }
+            self.save_data();
+            match crate::desktop_icons::restore_desktop_icons(&layout.icons) {
+                Ok(restored) => {
+                    Self::push_status(
+                        &self.status_message,
+                        &self.status_log,
+                        format!(
+                            "✅ Restored {}/{} desktop shortcuts from '{}'.",
+                            restored,
+                            layout.icons.len(),
+                            layout.name
+                        ),
+                    );
+                    self.refresh_desktop_shortcuts();
+                }
+                Err(e) => {
+                    Self::push_status(
+                        &self.status_message,
+                        &self.status_log,
+                        format!("⚠️ Failed to restore layout '{}': {:?}", layout.name, e),
+                    );
+                }
+            }
+        }
+    }
+
+    pub fn delete_shortcut_layout(&mut self, idx: usize) {
+        let removed = {
+            let mut data = self.data.lock();
+            if idx < data.shortcut_layouts.len() {
+                Some(data.shortcut_layouts.remove(idx))
+            } else {
+                None
+            }
+        };
+        if let Some(layout) = removed {
+            self.save_data();
+            self.refresh_tray();
+            Self::push_status(
+                &self.status_message,
+                &self.status_log,
+                format!("🗑 Deleted desktop shortcut layout '{}'.", layout.name),
+            );
+        }
+    }
+
+    pub fn get_shortcut_category(&self, shortcut_name: &str) -> Option<crate::models::ShortcutCategory> {
+        let data = self.data.lock();
+        let cat_id = data.shortcut_category_assignments.get(shortcut_name)?;
+        data.shortcut_categories.iter().find(|c| &c.id == cat_id).cloned()
+    }
+
+    pub fn set_shortcut_category(&mut self, shortcut_name: &str, category_id: Option<String>) {
+        {
+            let mut data = self.data.lock();
+            if let Some(id) = category_id {
+                data.shortcut_category_assignments.insert(shortcut_name.to_string(), id);
+            } else {
+                data.shortcut_category_assignments.remove(shortcut_name);
+            }
+        }
+        self.save_data();
+    }
+
+    pub fn add_shortcut_category(&mut self, name: &str, color: &str) -> bool {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return false;
+        }
+        let cat = crate::models::ShortcutCategory::new(trimmed, color);
+        {
+            let mut data = self.data.lock();
+            if data.shortcut_categories.iter().any(|c| c.name.eq_ignore_ascii_case(trimmed)) {
+                return false;
+            }
+            data.shortcut_categories.push(cat);
+        }
+        self.save_data();
+        true
+    }
+
+    pub fn delete_shortcut_category(&mut self, cat_id: &str) {
+        {
+            let mut data = self.data.lock();
+            data.shortcut_categories.retain(|c| c.id != cat_id);
+            data.shortcut_category_assignments.retain(|_, v| v != cat_id);
+        }
+        self.save_data();
+    }
+
+    pub fn load_suggested_categories(&mut self) {
+        let suggested = vec![
+            crate::models::ShortcutCategory::new("Games", "#10B981"),
+            crate::models::ShortcutCategory::new("Work", "#3B82F6"),
+            crate::models::ShortcutCategory::new("Utilities", "#8B5CF6"),
+            crate::models::ShortcutCategory::new("Media", "#F59E0B"),
+            crate::models::ShortcutCategory::new("System", "#64748B"),
+        ];
+        {
+            let mut data = self.data.lock();
+            for s in suggested {
+                if !data.shortcut_categories.iter().any(|c| c.name.eq_ignore_ascii_case(&s.name)) {
+                    data.shortcut_categories.push(s);
+                }
+            }
+        }
+        self.save_data();
     }
 
     pub fn get_auto_launch() -> auto_launch::AutoLaunch {

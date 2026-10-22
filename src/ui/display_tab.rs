@@ -34,7 +34,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                     egui::Color32::from_rgb(248, 250, 252)
                 })
                 .stroke(egui::Stroke::new(
-                    1.0,
+                    1.0_f32,
                     if app.dark_mode {
                         egui::Color32::from_rgb(44, 44, 44)
                     } else {
@@ -125,7 +125,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                                         };
                                         painter.line_segment(
                                             [egui::pos2(x, y), egui::pos2(x, next_y)],
-                                            egui::Stroke::new(1.0, color),
+                                            egui::Stroke::new(1.0_f32, color),
                                         );
                                     }
                                     y = next_y;
@@ -162,7 +162,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                                         };
                                         painter.line_segment(
                                             [egui::pos2(x, y), egui::pos2(next_x, y)],
-                                            egui::Stroke::new(1.0, color),
+                                            egui::Stroke::new(1.0_f32, color),
                                         );
                                     }
                                     x = next_x;
@@ -372,7 +372,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                                 m_rect.expand(2.0),
                                 egui::CornerRadius::same(6),
                                 egui::Stroke::new(
-                                    2.5,
+                                    2.5_f32,
                                     if app.dark_mode {
                                         egui::Color32::WHITE
                                     } else {
@@ -386,7 +386,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                                 m_rect,
                                 egui::CornerRadius::same(4),
                                 egui::Stroke::new(
-                                    1.5,
+                                    1.5_f32,
                                     if app.dark_mode {
                                         egui::Color32::from_white_alpha(40)
                                     } else {
@@ -508,6 +508,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                             );
                             app.new_display_profile_name.clear();
                             app.save_data();
+                            app.refresh_tray();
                             WindowManagerApp::push_status(
                                 &app.status_message,
                                 &app.status_log,
@@ -533,7 +534,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                     egui::Color32::from_rgb(248, 250, 252)
                 })
                 .stroke(egui::Stroke::new(
-                    1.0,
+                    1.0_f32,
                     if app.dark_mode {
                         egui::Color32::from_rgb(44, 44, 44)
                     } else {
@@ -572,7 +573,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                                     egui::Color32::from_rgb(241, 245, 249)
                                 })
                                 .stroke(egui::Stroke::new(
-                                    1.0,
+                                    1.0_f32,
                                     if app.dark_mode {
                                         egui::Color32::from_rgb(50, 50, 50)
                                     } else {
@@ -740,7 +741,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                     egui::Color32::from_rgb(248, 250, 252)
                 })
                 .stroke(egui::Stroke::new(
-                    1.0,
+                    1.0_f32,
                     if app.dark_mode {
                         egui::Color32::from_rgb(44, 44, 44)
                     } else {
@@ -793,7 +794,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                                         egui::Color32::from_rgb(241, 245, 249)
                                     })
                                     .stroke(egui::Stroke::new(
-                                        1.0,
+                                        1.0_f32,
                                         if app.dark_mode {
                                             egui::Color32::from_rgb(50, 50, 50)
                                         } else {
@@ -871,11 +872,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                         if i > 0 {
                             app.data.lock().display_profiles.swap(i, i - 1);
                             app.save_data();
-                            let profiles = app.data.lock().profiles.clone();
-                            let display_profiles = app.data.lock().display_profiles.clone();
-                            if let Some(t) = &app.tray {
-                                t.refresh_menu(&profiles, &display_profiles);
-                            }
+                            app.refresh_tray();
                         }
                     }
 
@@ -884,11 +881,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                         if i < len - 1 {
                             app.data.lock().display_profiles.swap(i, i + 1);
                             app.save_data();
-                            let profiles = app.data.lock().profiles.clone();
-                            let display_profiles = app.data.lock().display_profiles.clone();
-                            if let Some(t) = &app.tray {
-                                t.refresh_menu(&profiles, &display_profiles);
-                            }
+                            app.refresh_tray();
                         }
                     }
 
@@ -896,12 +889,7 @@ pub fn draw_display_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, available
                         let name = app.data.lock().display_profiles[idx].name.clone();
                         app.data.lock().display_profiles.remove(idx);
                         app.save_data();
-
-                        let profiles = app.data.lock().profiles.clone();
-                        let display_profiles = app.data.lock().display_profiles.clone();
-                        if let Some(t) = &app.tray {
-                            t.refresh_menu(&profiles, &display_profiles);
-                        }
+                        app.refresh_tray();
 
                         crate::app::WindowManagerApp::push_status(
                             &app.status_message,

@@ -2,6 +2,7 @@
 
 mod app;
 mod audio;
+mod desktop_icons;
 mod models;
 mod monitor;
 mod svg_render;

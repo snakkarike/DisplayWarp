@@ -36,6 +36,7 @@
 - **Visual Monitor Preview** — A scaled layout preview shows all your connected displays. The selected target is highlighted green as you edit.
 - **Window Process Tracking** — For launchers that spawn a child process (e.g. Battle.net → game), specify the child EXE name and DisplayWarp will wait for that window instead.
 - **Persistent Profiles** — Profiles are saved to `monitor_config.json` next to the exe and survive restarts.
+- **Desktop Shortcut Layouts** — Save the exact positions of all desktop icons and shortcuts across your monitors and restore them with one click or directly from the system tray.
 - **Zero Dependencies at Runtime** — Ships as a single `.exe`. No runtimes, no installers, no admin rights required for normal use.
 
 ---
@@ -56,6 +57,13 @@
 2. Pick the window from the dropdown.
 3. Pick the target monitor.
 4. Click **▶ Move**.
+
+### Save & Restore Desktop Shortcut Layouts
+
+1. Click the **Shortcuts** tab in the top navigation bar.
+2. View your live desktop shortcuts, search by name, or check their coordinates across displays.
+3. Enter a layout name and click **💾 Save** (or hit **📷 Snapshot** for an instant timestamped save).
+4. Whenever Windows scrambles your icons (after resolution changes or reconnecting displays), click **▶ Restore** in the app or directly from the system tray context menu.
 
 ---
 
