@@ -367,6 +367,8 @@ impl WindowManagerApp {
             return;
         }
         let mut icons = match crate::desktop_icons::capture_desktop_icons() {
+            Ok(icons) if !icons.is_empty() => icons,
+            _ if !self.live_desktop_shortcuts.is_empty() => self.live_desktop_shortcuts.clone(),
             Ok(icons) => icons,
             Err(e) => {
                 Self::push_status(

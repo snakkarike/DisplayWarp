@@ -26,7 +26,6 @@ fn is_dark_mode() -> bool {
             "Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize\0"
                 .encode_utf16()
                 .collect();
-        let value_name: Vec<u16> = "AppsUseLightTheme\0".encode_utf16().collect();
 
         let mut hkey = windows::Win32::System::Registry::HKEY::default();
         let open_result = RegOpenKeyExW(
@@ -40,24 +39,28 @@ fn is_dark_mode() -> bool {
             return false;
         }
 
-        let mut data: u32 = 0;
-        let mut data_size: u32 = std::mem::size_of::<u32>() as u32;
+        let query_val = |name: &str| -> Option<u32> {
+            let value_name: Vec<u16> = format!("{name}\0").encode_utf16().collect();
+            let mut data: u32 = 0;
+            let mut data_size: u32 = std::mem::size_of::<u32>() as u32;
+            let res = RegQueryValueExW(
+                hkey,
+                PCWSTR(value_name.as_ptr()),
+                None,
+                None,
+                Some(&mut data as *mut u32 as *mut u8),
+                Some(&mut data_size),
+            );
+            if res.is_ok() { Some(data) } else { None }
+        };
 
-        let query_result = RegQueryValueExW(
-            hkey,
-            PCWSTR(value_name.as_ptr()),
-            None,
-            None,
-            Some(&mut data as *mut u32 as *mut u8),
-            Some(&mut data_size),
-        );
-
+        // SystemUsesLightTheme determines taskbar/tray menu theme; fallback to AppsUseLightTheme
+        let theme_val = query_val("SystemUsesLightTheme").or_else(|| query_val("AppsUseLightTheme"));
         let _ = RegCloseKey(hkey);
 
-        if query_result.is_ok() {
-            data == 0
-        } else {
-            false
+        match theme_val {
+            Some(v) => v == 0,
+            None => false,
         }
     }
 }
@@ -171,6 +174,8 @@ pub fn apply_window_dark_mode(dark: bool) {
 
 #[derive(Default, Clone)]
 pub struct TrayState {
+    pub show_id: MenuId,
+    pub quit_id: MenuId,
     pub warp_ids: Vec<MenuId>,
     pub display_ids: Vec<MenuId>,
     pub shortcut_ids: Vec<MenuId>,
@@ -180,6 +185,81 @@ pub struct TrayItems {
     tray: TrayIcon,
     /// Shared with the background event thread — updated on every menu rebuild.
     state: Arc<Mutex<TrayState>>,
+}
+
+/// Unified builder for the system tray context menu.
+fn build_menu(
+    profiles: &[AppProfile],
+    layouts: &[SavedDisplayLayout],
+    shortcut_layouts: &[crate::desktop_icons::DesktopIconLayout],
+) -> (Menu, TrayState) {
+    let warp_icon = "▶️  ";
+    let display_icon = "▶️  ";
+    let empty_icon = "📂  ";
+
+    let show_item = MenuItem::new("👁  Show", true, None);
+    let quit_item = MenuItem::new("❌  Quit", true, None);
+    let show_id = show_item.id().clone();
+    let quit_id = quit_item.id().clone();
+
+    let menu = Menu::new();
+    let _ = menu.append(&show_item);
+    let _ = menu.append(&PredefinedMenuItem::separator());
+
+    let mut state = TrayState {
+        show_id,
+        quit_id,
+        warp_ids: Vec::new(),
+        display_ids: Vec::new(),
+        shortcut_ids: Vec::new(),
+    };
+
+    // 1. Warp Profiles
+    let warp_sub = Submenu::new("⚡  Warp Profiles", true);
+    if profiles.is_empty() {
+        let empty = MenuItem::new(format!("{}(No profiles)", empty_icon), false, None);
+        let _ = warp_sub.append(&empty);
+    } else {
+        for p in profiles {
+            let item = MenuItem::new(format!("{}{}", warp_icon, p.name), true, None);
+            state.warp_ids.push(item.id().clone());
+            let _ = warp_sub.append(&item);
+        }
+    }
+    let _ = menu.append(&warp_sub);
+
+    // 2. Display Profiles
+    let disp_sub = Submenu::new("🖥  Display Profiles", true);
+    if layouts.is_empty() {
+        let empty = MenuItem::new(format!("{}(No layouts)", empty_icon), false, None);
+        let _ = disp_sub.append(&empty);
+    } else {
+        for l in layouts {
+            let item = MenuItem::new(format!("{}{}", display_icon, l.name), true, None);
+            state.display_ids.push(item.id().clone());
+            let _ = disp_sub.append(&item);
+        }
+    }
+    let _ = menu.append(&disp_sub);
+
+    // 3. Shortcut Profiles
+    let shortcut_sub = Submenu::new("📌  Shortcut Profiles", true);
+    if shortcut_layouts.is_empty() {
+        let empty = MenuItem::new(format!("{}(No shortcut profiles)", empty_icon), false, None);
+        let _ = shortcut_sub.append(&empty);
+    } else {
+        for s in shortcut_layouts {
+            let item = MenuItem::new(format!("{}{}", display_icon, s.name), true, None);
+            state.shortcut_ids.push(item.id().clone());
+            let _ = shortcut_sub.append(&item);
+        }
+    }
+    let _ = menu.append(&shortcut_sub);
+
+    let _ = menu.append(&PredefinedMenuItem::separator());
+    let _ = menu.append(&quit_item);
+
+    (menu, state)
 }
 
 impl TrayItems {
@@ -199,59 +279,7 @@ impl TrayItems {
         uxtheme::flush_menu_themes();
         apply_window_dark_mode(dark);
 
-        let warp_icon = "▶️  ";
-        let display_icon = "▶️  ";
-        let empty_icon = "📂  ";
-
-        let show_item = MenuItem::new("👁  Show", true, None);
-        let quit_item = MenuItem::new("❌  Quit", true, None);
-        let menu = Menu::new();
-        let _ = menu.append(&show_item);
-        let _ = menu.append(&PredefinedMenuItem::separator());
-
-        let mut next_state = TrayState::default();
-
-        let warp_sub = Submenu::new("⚡  Warp Profiles", true);
-        if profiles.is_empty() {
-            let empty = MenuItem::new(format!("{}(No profiles)", empty_icon), false, None);
-            let _ = warp_sub.append(&empty);
-        } else {
-            for p in profiles {
-                let item = MenuItem::new(format!("{}{}", warp_icon, p.name), true, None);
-                next_state.warp_ids.push(item.id().clone());
-                let _ = warp_sub.append(&item);
-            }
-        }
-        let _ = menu.append(&warp_sub);
-
-        let disp_sub = Submenu::new("🖥  Display Profiles", true);
-        if layouts.is_empty() {
-            let empty = MenuItem::new(format!("{}(No layouts)", empty_icon), false, None);
-            let _ = disp_sub.append(&empty);
-        } else {
-            for l in layouts {
-                let item = MenuItem::new(format!("{}{}", display_icon, l.name), true, None);
-                next_state.display_ids.push(item.id().clone());
-                let _ = disp_sub.append(&item);
-            }
-        }
-        let _ = menu.append(&disp_sub);
-
-        let shortcut_sub = Submenu::new("📌  Shortcut Layouts", true);
-        if shortcut_layouts.is_empty() {
-            let empty = MenuItem::new(format!("{}(No shortcut layouts)", empty_icon), false, None);
-            let _ = shortcut_sub.append(&empty);
-        } else {
-            for s in shortcut_layouts {
-                let item = MenuItem::new(format!("{}{}", display_icon, s.name), true, None);
-                next_state.shortcut_ids.push(item.id().clone());
-                let _ = shortcut_sub.append(&item);
-            }
-        }
-        let _ = menu.append(&shortcut_sub);
-
-        let _ = menu.append(&PredefinedMenuItem::separator());
-        let _ = menu.append(&quit_item);
+        let (menu, next_state) = build_menu(profiles, layouts, shortcut_layouts);
 
         let _ = self.tray.set_tooltip(Some("DisplayWarp".to_string()));
 
@@ -276,21 +304,6 @@ pub fn create_tray(
     }
     uxtheme::flush_menu_themes();
 
-    let warp_icon = "▶️  ";
-    let display_icon = "▶️  ";
-    let empty_icon = "📂  ";
-
-    let show_item = MenuItem::new("👁  Show", true, None);
-    let quit_item = MenuItem::new("❌  Quit", true, None);
-    let show_id = show_item.id().clone();
-    let quit_id = quit_item.id().clone();
-
-    let menu = Menu::new();
-    let _ = menu.append(&show_item);
-    let _ = menu.append(&PredefinedMenuItem::separator());
-
-    let mut state = TrayState::default();
-
     let (profiles_snapshot, layouts_snapshot, shortcuts_snapshot) = {
         let d = data.lock();
         (
@@ -300,47 +313,7 @@ pub fn create_tray(
         )
     };
 
-    let warp_sub = Submenu::new("⚡  Warp Profiles", true);
-    if profiles_snapshot.is_empty() {
-        let empty = MenuItem::new(format!("{}(No profiles)", empty_icon), false, None);
-        let _ = warp_sub.append(&empty);
-    } else {
-        for p in &profiles_snapshot {
-            let item = MenuItem::new(format!("{}{}", warp_icon, p.name), true, None);
-            state.warp_ids.push(item.id().clone());
-            let _ = warp_sub.append(&item);
-        }
-    }
-    let _ = menu.append(&warp_sub);
-
-    let disp_sub = Submenu::new("🖥  Display Profiles", true);
-    if layouts_snapshot.is_empty() {
-        let empty = MenuItem::new(format!("{}(No layouts)", empty_icon), false, None);
-        let _ = disp_sub.append(&empty);
-    } else {
-        for l in &layouts_snapshot {
-            let item = MenuItem::new(format!("{}{}", display_icon, l.name), true, None);
-            state.display_ids.push(item.id().clone());
-            let _ = disp_sub.append(&item);
-        }
-    }
-    let _ = menu.append(&disp_sub);
-
-    let shortcut_sub = Submenu::new("📌  Shortcut Layouts", true);
-    if shortcuts_snapshot.is_empty() {
-        let empty = MenuItem::new(format!("{}(No shortcut layouts)", empty_icon), false, None);
-        let _ = shortcut_sub.append(&empty);
-    } else {
-        for s in &shortcuts_snapshot {
-            let item = MenuItem::new(format!("{}{}", display_icon, s.name), true, None);
-            state.shortcut_ids.push(item.id().clone());
-            let _ = shortcut_sub.append(&item);
-        }
-    }
-    let _ = menu.append(&shortcut_sub);
-
-    let _ = menu.append(&PredefinedMenuItem::separator());
-    let _ = menu.append(&quit_item);
+    let (menu, state) = build_menu(&profiles_snapshot, &layouts_snapshot, &shortcuts_snapshot);
 
     let icon = tray_icon();
     let tray = TrayIconBuilder::new()
@@ -358,14 +331,14 @@ pub fn create_tray(
         loop {
             if let Ok(event) = receiver.recv() {
                 let id = event.id().clone();
-                if id == quit_id {
+                let st = state_thread.lock().clone();
+
+                if id == st.quit_id {
                     watcher_running.store(false, Ordering::Relaxed);
                     std::process::exit(0);
-                } else if id == show_id {
+                } else if id == st.show_id {
                     show_window_native();
                 } else {
-                    let st = state_thread.lock().clone();
-
                     // Check Warp Profiles
                     let mut found = false;
                     for (idx, pid) in st.warp_ids.iter().enumerate() {
@@ -419,6 +392,14 @@ pub fn create_tray(
                                 d.shortcut_layouts.get(idx).cloned()
                             };
                             if let Some(l) = layout {
+                                {
+                                    let mut d = data.lock();
+                                    for icon in &l.icons {
+                                        if let Some(cat_id) = &icon.category_id {
+                                            d.shortcut_category_assignments.insert(icon.name.clone(), cat_id.clone());
+                                        }
+                                    }
+                                }
                                 match crate::desktop_icons::restore_desktop_icons(&l.icons) {
                                     Ok(restored) => {
                                         crate::app::WindowManagerApp::push_status(

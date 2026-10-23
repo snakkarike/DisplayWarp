@@ -425,6 +425,7 @@ pub fn draw_settings_tab(app: &mut WindowManagerApp, ui: &mut egui::Ui, availabl
                                                 }
                                                 drop(d);
                                                 app.save_data();
+                                                app.refresh_tray();
                                                 crate::app::WindowManagerApp::push_status(
                                                     &app.status_message,
                                                     &app.status_log,

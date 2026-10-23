@@ -1,3 +1,23 @@
+## v1.1.3
+
+### 🛠️ Fixes & Tray Improvements
+
+- **System Tray Quit & Show Actions**: Fixed a bug where right-clicking the tray icon and selecting "Quit" or "Show" became unresponsive after profile or layout refreshes. Menu item IDs (`show_id` and `quit_id`) are now persistently tracked in shared state across menu rebuilds.
+- **Unified Menu Construction**: Deduplicated tray menu generation into a shared `build_menu` builder, eliminating redundant code and keeping tray initialization and runtime refreshes synchronized.
+- **Shortcut Profiles Tray Integration**: Renamed the tray submenu to **Shortcut Profiles** to maintain naming parity with **Warp Profiles** and **Display Profiles**. Restoring shortcut layouts from the tray now also restores assigned categories.
+- **Reliable Shortcut Capturing**: Added a live-shortcut fallback when saving desktop shortcut profiles to protect against intermittent Windows Explorer COM busy states.
+- **Accurate Taskbar Dark Mode Detection**: Updated `is_dark_mode()` to check `SystemUsesLightTheme` (with fallback to `AppsUseLightTheme`) so taskbar context menus follow the active Windows shell theme.
+- **Settings Import Refresh**: Trigger an immediate system tray menu refresh after importing profiles in Settings.
+
+### 📦 Dependency & Framework Upgrades
+
+- **tray-icon 0.26.1**: Upgraded to latest `tray-icon` and `muda 0.21.2` for improved system tray stability and menu dispatching on Windows.
+- **parking_lot 0.13.0**: Upgraded core synchronization primitives to the latest release.
+- **ureq 3.5.0**: Migrated the in-app updater to `ureq 3.5.0` with the new configuration builder, request headers, and streamed body reader API.
+- **winresource 0.1.34**: Updated executable resource embedding build dependency along with latest dependency tree updates via `cargo update`.
+
+---
+
 ## v1.1.2
 
 ### ✨ New Features

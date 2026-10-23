@@ -1,3 +1,4 @@
+use std::io::Read;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -86,20 +87,22 @@ impl UpdateManager {
     fn perform_check() -> Result<UpdateStatus, String> {
         let current_version = env!("CARGO_PKG_VERSION");
 
-        let agent = ureq::AgentBuilder::new()
-            .timeout_connect(Duration::from_secs(8))
-            .timeout_read(Duration::from_secs(10))
+        let agent = ureq::Agent::config_builder()
+            .timeout_connect(Some(Duration::from_secs(8)))
+            .timeout_recv_response(Some(Duration::from_secs(10)))
             .user_agent(USER_AGENT)
-            .build();
+            .build()
+            .new_agent();
 
         let response = agent
             .get(GITHUB_API_URL)
-            .set("Accept", "application/vnd.github.v3+json")
+            .header("Accept", "application/vnd.github.v3+json")
             .call()
             .map_err(|e| format!("Failed to connect to GitHub releases: {}", e))?;
 
         let body: serde_json::Value = response
-            .into_json()
+            .into_body()
+            .read_json()
             .map_err(|e| format!("Invalid release response format: {}", e))?;
 
         let tag_name = body["tag_name"]
@@ -206,23 +209,21 @@ impl UpdateManager {
 
         let new_exe = current_exe.with_extension("new.exe");
 
-        let agent = ureq::AgentBuilder::new()
-            .timeout_connect(Duration::from_secs(15))
-            .timeout_read(Duration::from_secs(60))
+        let agent = ureq::Agent::config_builder()
+            .timeout_connect(Some(Duration::from_secs(15)))
+            .timeout_recv_body(Some(Duration::from_secs(120)))
             .user_agent(USER_AGENT)
-            .build();
+            .build()
+            .new_agent();
 
         let response = agent
             .get(download_url)
             .call()
             .map_err(|e| format!("Failed to download update: {}", e))?;
 
-        let total_bytes = response
-            .header("Content-Length")
-            .and_then(|h| h.parse::<u64>().ok())
-            .unwrap_or(0);
+        let total_bytes = response.body().content_length().unwrap_or(0);
 
-        let mut reader = response.into_reader();
+        let mut reader = response.into_body().into_reader();
         let mut file = std::fs::File::create(&new_exe)
             .map_err(|e| format!("Failed to create temporary update file: {}", e))?;
 
